@@ -1,0 +1,20 @@
+backend:
+  family: api # api | transformers | vllm
+  model: unsloth/Qwen3.6-35B-A3B-MTP-GGUF
+  api_provider: openai # openai | anthropic (only when family == api)
+  endpoint: http://192.168.35.94:8888/v1 # optional, for OpenAI-compatible endpoints
+  max_retries: 3
+  concurrency: 1 # 1 = sequential (upstream default)
+generation:
+  do_sample: false
+  max_new_tokens: 2048
+prompt:
+  system: 당신은 문제를 해결하는 전문가입니다.
+  user_template: |
+    다음 문제에 대해서 충분히 생각하고 추론하여, 10개의 보기(A, B, C, D, E, F, G, H, I, J) 중 정답을 고르세요.
+
+    {question}
+
+    답변은 반드시 다음 형식을 엄격히 지켜야 합니다: "정답은 [정답 보기]입니다."로 끝나야하고, [정답 보기]는 A, B, C, D, E, F, G, H, I, J 중 하나여야 합니다. 정답: 문제를 풀기 위해, 한 번 천천히 생각해봅시다.
+extraction:
+  regex: '정답은\s*(.*?)\s*입니다'

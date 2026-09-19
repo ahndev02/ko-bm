@@ -145,42 +145,49 @@ section p { margin: 0 0 0.9rem; }
 }
 .status.error { color: #8c1d18; }
 
-/* Run cards */
+/* Run cards: single column at every width. The narrow measure keeps prose
+   readable; a two-column split left ~315px per card and crushed the
+   definition-list values, so cards stack full-measure instead. */
 .cards {
   list-style: none;
   margin: 1rem 0 0;
   padding: 0;
   display: grid;
-  gap: 0.9rem;
+  gap: 1rem;
 }
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 1rem 1.1rem;
+  padding: 1.25rem 1.35rem;
 }
 .card.lead { border-left: 5px solid var(--accent); }
 .card h3 {
   margin: 0 0 0.15rem;
-  font-size: 1.05rem;
+  font-size: 1.1rem;
   line-height: 1.4;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .card .model-id {
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.6rem;
   font-size: 0.85rem;
   color: var(--muted);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .card dl {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 0.15rem 0.9rem;
+  gap: 0.35rem 1rem;
   margin: 0;
   font-size: 0.95rem;
 }
 .card dt { color: var(--muted); }
-.card dd { margin: 0; font-variant-numeric: tabular-nums; }
+.card dd {
+  margin: 0;
+  min-width: 0; /* let long values wrap instead of forcing the card wider */
+  overflow-wrap: break-word;
+  font-variant-numeric: tabular-nums;
+}
 .card .score { font-size: 1.15rem; font-weight: 650; }
 .card .evidence {
   margin-top: 0.6rem;
@@ -313,11 +320,9 @@ pre {
   padding: 1.25rem 0 2.5rem;
 }
 
-/* Wider screens: two-column cards, roomier type */
+/* Wider screens: roomier type only (cards stay single-column by design). */
 @media (min-width: 46rem) {
   .site-header h1 { font-size: 2.4rem; }
-  .cards { grid-template-columns: 1fr 1fr; }
-  .card.wide { grid-column: 1 / -1; }
 }
 
 /* Reduced motion: no decorative animation anywhere (none is used). */

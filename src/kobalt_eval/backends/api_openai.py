@@ -87,6 +87,8 @@ class OpenAICompatibleBackend(Backend):
             "model": self.model,
             "messages": messages,
             "max_tokens": self.max_new_tokens,
+            # Deterministic default (CON-002, matches upstream temperature=0.0).
+            "temperature": 0.0,
         }
         # engine_opts may carry extra provider params (e.g. temperature); merge last.
         params.update(self.engine_opts)

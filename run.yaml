@@ -1,8 +1,12 @@
 backend:
   family: api # api | transformers | vllm
-  model: unsloth/Qwen3.6-35B-A3B-MTP-GGUF
+  model: google/gemini-3.8-flash:floor
   api_provider: openai # openai | anthropic (only when family == api)
-  endpoint: http://192.168.35.94:8888/v1 # optional, for OpenAI-compatible endpoints
+  endpoint: https://openrouter.ai/api/v1 # optional, for OpenAI-compatible endpoints
+  engine_opts:
+    extra_body:
+      # chat_template_kwargs:
+      #   enable_thinking: false
   max_retries: 3
   concurrency: 1 # 1 = sequential (upstream default)
 generation:

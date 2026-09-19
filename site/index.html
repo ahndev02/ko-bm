@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KoBALT-700 Benchmark Runs — Research Report</title>
+<meta name="description" content="Transparent research report of KoBALT-700 Korean linguistic benchmark runs: overall scores with uncertainty, domain and difficulty breakdowns, reasoning ablations, method, and evidence.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header class="site-header">
+  <div class="measure">
+    <p class="kicker">Research report &middot; Korean language benchmark</p>
+    <h1>KoBALT-700 benchmark runs</h1>
+    <p class="lede" id="scope-line" data-fallback="true">KoBALT-700 is a set of 700 expert-written Korean multiple-choice items across five linguistic domains. This page reports our own evaluation runs: what was tested, how, and what came out. It is a record, not a ranking.</p>
+    <p class="meta-line" id="report-meta">Loading run metadata&hellip;</p>
+    <p class="link-row">
+      <a href="https://arxiv.org/abs/2505.16125">Paper (arXiv:2505.16125)</a>
+      <span aria-hidden="true">&middot;</span>
+      <a href="https://github.com/snunlp/KoBALT-700">Upstream benchmark repository</a>
+      <span aria-hidden="true">&middot;</span>
+      <a href="https://huggingface.co/datasets/snunlp/KoBALT-700">Dataset (snunlp/KoBALT-700)</a>
+    </p>
+    <aside class="caveat" aria-label="Important caveat">
+      <p><strong>Read this first:</strong> one run per configuration. The intervals shown describe item-level sampling uncertainty within these 700 items &mdash; they do not describe run-to-run repeatability, which was not measured.</p>
+    </aside>
+  </div>
+</header>
+
+<nav class="site-nav" aria-label="Report sections">
+  <div class="measure">
+    <ul>
+      <li><a href="#results">Overall results</a></li>
+      <li><a href="#domains">By domain</a></li>
+      <li><a href="#difficulty">By difficulty</a></li>
+      <li><a href="#ablations">Reasoning ablations</a></li>
+      <li><a href="#reliability">Reliability</a></li>
+      <li><a href="#method">Method</a></li>
+      <li><a href="#reproduce">Reproduce &amp; evidence</a></li>
+      <li><a href="#limitations">Limitations</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main id="main">
+  <div class="measure">
+
+    <p id="status" class="status" role="status" aria-live="polite">Loading results&hellip;</p>
+    <noscript><p class="status">This report&rsquo;s numbers load from <code>results.json</code> and need JavaScript enabled. The method, limitations, and evidence links described below still apply.</p></noscript>
+
+    <section id="results" aria-labelledby="results-h">
+      <h2 id="results-h">Overall results</h2>
+      <p>Each row is one complete run of all 700 items. Accuracy is strict exact match: the extracted answer must equal the gold choice. Ten options per item, so chance is 10%. The chart and the cards show the same numbers; accuracy is the focus, not rank order.</p>
+      <figure class="chart-block">
+        <div id="overall-chart" class="chart" role="img" aria-label="Dot-and-interval chart of overall accuracy with 95 percent Wilson intervals. Exact values are listed in the run cards below."></div>
+        <figcaption>Overall accuracy with 95% Wilson intervals. Axis starts at zero. Exact values are in the cards below.</figcaption>
+      </figure>
+      <div id="run-cards" class="cards"></div>
+    </section>
+
+    <section id="domains" aria-labelledby="domains-h">
+      <h2 id="domains-h">Results by domain</h2>
+      <p>Five linguistic domains. Sample sizes differ widely (Syntax 300 items, Morphology 42), so small-domain scores are noisier. Bars share one zero-based scale; exact values follow in the disclosure.</p>
+      <figure class="chart-block">
+        <div id="domain-chart" class="chart" role="img" aria-label="Grouped bar chart of accuracy by linguistic domain for each primary run. Exact values are in the table below."></div>
+        <figcaption>Accuracy by domain, primary runs. Group labels include item counts.</figcaption>
+      </figure>
+      <details id="domain-details" class="disclosure">
+        <summary>Exact domain values (table)</summary>
+        <div class="table-wrap" id="domain-table-wrap"></div>
+      </details>
+    </section>
+
+    <section id="difficulty" aria-labelledby="difficulty-h">
+      <h2 id="difficulty-h">Results by difficulty</h2>
+      <p>Three difficulty levels (Level 1: 182 items, Level 2: 220, Level 3: 298). Every run falls off toward Level 3; this breakdown is where the runs differ most.</p>
+      <figure class="chart-block">
+        <div id="level-chart" class="chart" role="img" aria-label="Grouped bar chart of accuracy by difficulty level for each primary run. Exact values are in the table below."></div>
+        <figcaption>Accuracy by difficulty level, primary runs. Group labels include item counts.</figcaption>
+      </figure>
+      <details id="level-details" class="disclosure">
+        <summary>Exact difficulty values (table)</summary>
+        <div class="table-wrap" id="level-table-wrap"></div>
+      </details>
+    </section>
+
+    <section id="ablations" aria-labelledby="ablations-h">
+      <h2 id="ablations-h">Reasoning ablations</h2>
+      <p>These are configuration experiments, kept separate from the primary results above. They are not model ranks: the same model is run with a different provider reasoning setting, and everything else is held fixed.</p>
+      <div id="ablation-body"></div>
+    </section>
+
+    <section id="reliability" aria-labelledby="reliability-h">
+      <h2 id="reliability-h">Reliability: invalid outputs and latency</h2>
+      <p>An output counts as <em>invalid</em> when no single A&ndash;J choice can be extracted from it; invalid outputs count as wrong. Latency depends on the endpoint and deployment used for each run (provider API, routing tier, or local server) and <strong>should not be read as intrinsic model speed</strong>.</p>
+      <div class="table-wrap" id="reliability-table-wrap"></div>
+    </section>
+
+    <section id="method" aria-labelledby="method-h">
+      <h2 id="method-h">Method</h2>
+      <ul class="method-list">
+        <li><strong>Decoding:</strong> deterministic settings throughout &mdash; <code>do_sample: false</code> (greedy where the backend supports it; <code>temperature: 0.0</code> on the API backends), with a <code>max_new_tokens: 2048</code> cap. All runs share one prompt template (hash <code>39412071&hellip;</code>; full hash in each evidence snapshot).</li>
+        <li><strong>Prompt:</strong> Korean chain-of-thought prompt, shown here exactly as sent (with <code>{question}</code> replaced by the item text):</li>
+      </ul>
+      <figure class="prompt-block">
+        <figcaption class="prompt-caption">System message (original Korean)</figcaption>
+        <pre lang="ko">당신은 문제를 해결하는 전문가입니다.</pre>
+      </figure>
+      <figure class="prompt-block">
+        <figcaption class="prompt-caption">User message template (original Korean)</figcaption>
+        <pre lang="ko">다음 문제에 대해서 충분히 생각하고 추론하여, 10개의 보기(A, B, C, D, E, F, G, H, I, J) 중 정답을 고르세요.
+
+{question}
+
+답변은 반드시 다음 형식을 엄격히 지켜야 합니다: "정답은 [정답 보기]입니다."로 끝나야하고, [정답 보기]는 A, B, C, D, E, F, G, H, I, J 중 하나여야 합니다. 정답: 문제를 풀기 위해, 한 번 천천히 생각해봅시다.</pre>
+      </figure>
+      <p class="translation"><strong>English translation (for reference only; models saw the Korean above):</strong> &ldquo;Think through the following problem and choose the correct answer from the 10 options (A, B, C, D, E, F, G, H, I, J). &#91;question&#93; Your answer must strictly keep the following form: it must end with &lsquo;정답은 [choice]입니다.&rsquo; ([The answer is [choice].]), where [choice] is one of A&ndash;J. Answer: To solve this, let us think slowly.&rdquo;</p>
+      <ul class="method-list">
+        <li><strong>Answer extraction:</strong> strict regular expression <code>정답은\s*(.*?)\s*입니다</code>; from each match, A&ndash;J letters are collected in order. The run is correct only if the extracted string is exactly the gold letter.</li>
+        <li><strong>Invalid outputs count as wrong.</strong> A missing or malformed final-answer phrase is scored 0, not excluded.</li>
+      </ul>
+    </section>
+
+    <section id="reproduce" aria-labelledby="reproduce-h">
+      <h2 id="reproduce-h">Reproduce &amp; evidence</h2>
+      <p>Each run directory keeps a config snapshot and a scored results file; the per-run cards above link to both. This page itself is generated from those files &mdash; raw model predictions are not published, so only the snapshot and results links below exist.</p>
+      <p>Regenerate the data file with:</p>
+      <pre>python3 site/build.py</pre>
+      <p class="small">This reads completed run directories under <code>runs/</code> and writes <code>site/results.json</code> plus the evidence copies under <code>site/data/runs/&lt;run&gt;/</code>. Incomplete runs are skipped and listed separately.</p>
+    </section>
+
+    <section id="limitations" aria-labelledby="limitations-h">
+      <h2 id="limitations-h">Limitations</h2>
+      <ul>
+        <li>KoBALT-700 is a public benchmark, so prior exposure of these items in model training (contamination) is unknown and cannot be ruled out.</li>
+        <li>One run per configuration: there is no measure of run-to-run repeatability, and close scores may not reflect a real difference.</li>
+        <li>The recorded dataset revision is <code>0.0.0</code>, a placeholder &mdash; it is not content-addressed, so exact dataset identity rests on the benchmark release rather than a pinned hash.</li>
+        <li>Reasoning policies differ across runs (provider default, explicit minimal effort, disabled); comparisons across those settings are about configuration, not models alone.</li>
+        <li>Small subgroups are noisy: several subclasses have fewer than 20 items, and single items can move those percentages by several points. Treat the domain and level tables above as descriptive.</li>
+      </ul>
+    </section>
+
+    <details id="skipped" class="disclosure subdued">
+      <summary id="skipped-summary">Skipped or incomplete runs</summary>
+      <div id="skipped-body"></div>
+    </details>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="measure">
+    <p id="footer-line" class="small">KoBALT-700 research report. Generated from run directories; see evidence links per run.</p>
+  </div>
+</footer>
+
+<script src="charts.js" defer></script>
+</body>
+</html>

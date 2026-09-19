@@ -92,6 +92,8 @@ class AnthropicBackend(Backend):
             "model": self.model,
             "max_tokens": self.max_new_tokens,
             "messages": rest,
+            # Deterministic default (CON-002, matches upstream temperature=0.0).
+            "temperature": 0.0,
         }
         if system:
             params["system"] = system

@@ -1,0 +1,667 @@
+#!/usr/bin/env python3
+"""Deterministic data-generation lane for the static KoBALT-700 benchmark site.
+
+Reads completed run directories under ``runs/`` and emits a deterministic
+``site/results.json`` plus publish-safe evidence copies under
+``site/data/runs/<slug>/``.
+
+Standard library only (no third-party imports). Runnable as::
+
+    python3 site/build.py            # from the repo root (or any cwd)
+
+Completion rule
+---------------
+A run directory counts as *completed* only when it contains all of::
+
+    config.snapshot.yaml, predictions.jsonl, results.json
+
+Directories missing any of these are *skipped* (listed under ``"skipped"``
+in the payload) so incomplete/aborted runs never poison the site.
+
+Malformed *completed* runs (bad JSON/YAML, duplicate prediction ids,
+prediction count disagreeing with ``results.json``, inconsistent item
+counts across runs, ...) fail the build loudly via :class:`BuildError`.
+
+Per-run derivations
+--------------------
+Model id, display label, slug/path, timestamp (parsed from the ``run-``
+dirname when possible), endpoint/provider, reasoning mode from
+``engine_opts`` (``provider-default`` when absent/null, the explicit
+effort string when present), max tokens, prompt hash, dataset
+name/revision, accuracy/correct/total, 95% Wilson interval, per-domain
+and per-level tables, invalid-answer count/rate (``predicted_answer``
+that is not exactly one of ``A``-``J``), empty raw-output count, and
+median / nearest-rank p95 latency.
+
+An explicit ``reasoning.effort: none`` is classified as
+``category == "ablation"`` so it stays separable from primary results.
+Every other condition is preserved plainly (``engine_extra_body``);
+no fairness claims are made here.
+
+Only ``config.snapshot.yaml`` and ``results.json`` are copied into
+``site/data/``. Raw predictions and logs are never published, and no
+API keys or environment *values* are ever added (snapshots already
+carry only the env-var *name*).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import re
+import shutil
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+COMPLETION_FILES = ("config.snapshot.yaml", "predictions.jsonl", "results.json")
+PUBLISH_SAFE_FILES = ("config.snapshot.yaml", "results.json")
+VALID_CHOICES = frozenset("ABCDEFGHIJ")
+WILSON_Z = 1.96  # 95% two-sided normal quantile
+
+_RUN_DIR_RE = re.compile(
+    r"^run-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})-(.+)$"
+)
+_MAPPING_RE = re.compile(r"^([^:]+):(?:\s+(.*?))?\s*$")
+
+
+class BuildError(Exception):
+    """Fatal, clearly-attributed build failure for a malformed completed run."""
+
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+
+def repo_root() -> Path:
+    """Repo root derived from this file's location (robust to cwd)."""
+    return Path(__file__).resolve().parents[1]
+
+
+# ---------------------------------------------------------------------------
+# Minimal stdlib YAML-subset parser (for config.snapshot.yaml)
+# ---------------------------------------------------------------------------
+
+def _parse_scalar(text: str) -> Any:
+    s = text.strip()
+    if s in ("", "null", "Null", "NULL", "~"):
+        return None
+    if s in ("true", "True", "TRUE"):
+        return True
+    if s in ("false", "False", "FALSE"):
+        return False
+    if re.fullmatch(r"[+-]?\d+", s):
+        try:
+            return int(s)
+        except ValueError:
+            pass
+    if re.fullmatch(r"[+-]?(\d+\.\d*|\.\d+|\d+)([eE][+-]?\d+)?", s):
+        try:
+            return float(s)
+        except ValueError:
+            pass
+    if len(s) >= 2 and s.startswith("'") and s.endswith("'"):
+        return s[1:-1].replace("''", "'")
+    if len(s) >= 2 and s.startswith('"') and s.endswith('"'):
+        try:
+            return json.loads(s)
+        except json.JSONDecodeError:
+            return s[1:-1]
+    return s
+
+
+def _consume_single_quoted(first: str, lines: list[str], idx: int) -> tuple[str, int]:
+    """Consume a single-quoted scalar that starts in ``first`` (text after
+    ``key:``) and may span following lines. Returns (raw_scalar, next_idx)."""
+    buf = first
+    i = idx
+    while True:
+        # Scan for closing quote, honouring '' escapes.
+        j = 1  # skip opening quote
+        closed = False
+        while j < len(buf):
+            if buf[j] == "'":
+                if j + 1 < len(buf) and buf[j + 1] == "'":
+                    j += 2
+                    continue
+                closed = j == len(buf) - 1 or buf[j + 1:].strip() == ""
+                if closed:
+                    break
+                j += 1
+            else:
+                j += 1
+        if closed:
+            return buf, i
+        if i >= len(lines):
+            raise BuildError(f"malformed snapshot: unterminated quoted scalar: {first[:60]!r}")
+        buf += "\n" + lines[i]
+        i += 1
+
+
+def parse_simple_yaml(text: str) -> dict[str, Any]:
+    """Parse the indentation-based mapping subset written by ``yaml.safe_dump``.
+
+    Supports nested mappings, null/bool/int/float scalars, single-quoted
+    (possibly multi-line) scalars and plain scalars. Lists are not
+    supported and raise :class:`BuildError`.
+    """
+    root: dict[str, Any] = {}
+    stack: list[tuple[int, dict[str, Any]]] = [(-1, root)]
+    lines = text.splitlines()
+    i = 0
+    while i < len(lines):
+        raw = lines[i]
+        i += 1
+        if not raw.strip() or raw.strip().startswith("#"):
+            continue
+        if raw.lstrip().startswith("- "):
+            raise BuildError(f"malformed snapshot: list items not supported: {raw.strip()[:60]!r}")
+        indent = len(raw) - len(raw.lstrip(" "))
+        stripped = raw.strip()
+        m = _MAPPING_RE.match(stripped)
+        if not m or (":" not in stripped):
+            raise BuildError(f"malformed snapshot: cannot parse line: {stripped[:80]!r}")
+        # Split on the first colon that is followed by whitespace or EOL, so
+        # values containing ':' (URLs, timestamps, ...) survive intact.
+        colon = None
+        for pos, ch in enumerate(stripped):
+            if ch == ":" and (pos + 1 == len(stripped) or stripped[pos + 1] in " \t"):
+                colon = pos
+                break
+        if colon is None:
+            raise BuildError(f"malformed snapshot: cannot parse line: {stripped[:80]!r}")
+        key = stripped[:colon].strip()
+        rest = stripped[colon + 1:].strip()
+        if not key:
+            raise BuildError(f"malformed snapshot: empty key in line: {stripped[:80]!r}")
+        value: Any = None
+        if rest.startswith("'"):
+            value, i = _consume_single_quoted(rest, lines, i)
+            value = _parse_scalar(value)
+        elif rest != "":
+            value = _parse_scalar(rest)
+        while stack and indent <= stack[-1][0]:
+            stack.pop()
+        parent = stack[-1][1]
+        if rest == "":
+            child: dict[str, Any] = {}
+            parent[key] = child
+            stack.append((indent, child))
+        else:
+            parent[key] = value
+    return root
+
+
+def load_snapshot(path: str | Path) -> dict[str, Any]:
+    """Load a snapshot file (YAML subset; JSON-tolerant, stdlib only)."""
+    p = Path(path)
+    try:
+        text = p.read_text(encoding="utf-8")
+    except OSError as e:
+        raise BuildError(f"{p.parent.name}: cannot read config.snapshot.yaml ({e})")
+    stripped = text.strip()
+    if stripped.startswith("{"):
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as e:
+            raise BuildError(f"{p.parent.name}: malformed config.snapshot.yaml ({e})")
+        if not isinstance(data, dict):
+            raise BuildError(f"{p.parent.name}: malformed config.snapshot.yaml (top-level mapping expected)")
+        return data
+    try:
+        data = parse_simple_yaml(text)
+    except BuildError:
+        raise
+    except Exception as e:  # pragma: no cover - defensive
+        raise BuildError(f"{p.parent.name}: malformed config.snapshot.yaml ({e})")
+    return data
+
+
+# ---------------------------------------------------------------------------
+# Small derivations
+# ---------------------------------------------------------------------------
+
+def find_reasoning_effort(engine_opts: Any) -> str | None:
+    """Return the explicit reasoning effort string, or None when absent/null.
+
+    Looks for a ``reasoning: {effort: ...}`` mapping anywhere inside
+    ``engine_opts`` (normally ``extra_body.reasoning.effort``). Depth-first
+    search in deterministic (sorted-key) order.
+    """
+    found: list[Any] = []
+
+    def _search(node: Any) -> None:
+        if found or not isinstance(node, dict):
+            return
+        reasoning = node.get("reasoning")
+        if isinstance(reasoning, dict) and "effort" in reasoning:
+            found.append(reasoning["effort"])
+            return
+        for key in sorted(node, key=str):
+            _search(node[key])
+
+    _search(engine_opts if isinstance(engine_opts, dict) else {})
+    if not found or found[0] is None:
+        return None
+    return str(found[0])
+
+
+def short_model_label(model_id: Any) -> str:
+    if not model_id:
+        return ""
+    return str(model_id).split("/")[-1]
+
+
+def parse_run_timestamp(slug: str) -> str | None:
+    """Infer an ISO-8601 UTC timestamp from a ``run-YYYYMMDD-HHMMSS-*`` slug."""
+    m = _RUN_DIR_RE.match(slug)
+    if not m:
+        return None
+    try:
+        dt = datetime(
+            int(m.group(1)), int(m.group(2)), int(m.group(3)),
+            int(m.group(4)), int(m.group(5)), int(m.group(6)),
+            tzinfo=timezone.utc,
+        )
+    except ValueError:
+        return None
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def wilson_interval(num_correct: int, total: int, z: float = WILSON_Z) -> tuple[float, float]:
+    """95% Wilson score interval for a binomial proportion."""
+    if total <= 0:
+        return (0.0, 1.0)
+    p = num_correct / total
+    denom = 1.0 + z * z / total
+    center = p + z * z / (2.0 * total)
+    margin = z * math.sqrt(p * (1.0 - p) / total + z * z / (4.0 * total * total))
+    return (max(0.0, (center - margin) / denom), min(1.0, (center + margin) / denom))
+
+
+def median_of(values: list[float]) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    n = len(ordered)
+    mid = n // 2
+    if n % 2 == 1:
+        return float(ordered[mid])
+    return (ordered[mid - 1] + ordered[mid]) / 2.0
+
+
+def nearest_rank_percentile(values: list[float], pct: float) -> float | None:
+    """Nearest-rank percentile (e.g. p95): ceil(pct/100 * n)-th smallest."""
+    if not values:
+        return None
+    ordered = sorted(values)
+    rank = math.ceil(pct / 100.0 * len(ordered))
+    rank = min(max(rank, 1), len(ordered))
+    return float(ordered[rank - 1])
+
+
+def is_valid_answer(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 1 and value in VALID_CHOICES
+
+
+# ---------------------------------------------------------------------------
+# Run discovery / validation
+# ---------------------------------------------------------------------------
+
+def discover_runs(runs_dir: str | Path) -> tuple[list[Path], list[dict[str, str]]]:
+    """Split run dirs into (completed, skipped).
+
+    Completed = contains all of :data:`COMPLETION_FILES`. Anything else is
+    skipped with a plain reason; discovery never fails.
+    """
+    runs_path = Path(runs_dir)
+    if not runs_path.is_dir():
+        raise BuildError(f"runs directory not found: {runs_dir}")
+    completed: list[Path] = []
+    skipped: list[dict[str, str]] = []
+    for child in sorted(runs_path.iterdir(), key=lambda p: p.name):
+        if not child.is_dir():
+            continue
+        missing = [f for f in COMPLETION_FILES if not (child / f).is_file()]
+        if missing:
+            skipped.append({"slug": child.name, "reason": f"missing: {', '.join(missing)}"})
+        else:
+            completed.append(child)
+    return completed, skipped
+
+
+def read_predictions(path: str | Path) -> list[dict[str, Any]]:
+    p = Path(path)
+    try:
+        text = p.read_text(encoding="utf-8")
+    except OSError as e:
+        raise BuildError(f"{p.parent.name}: cannot read predictions.jsonl ({e})")
+    records: list[dict[str, Any]] = []
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError as e:
+            raise BuildError(f"{p.parent.name}: malformed predictions.jsonl line {lineno} ({e})")
+        if not isinstance(rec, dict):
+            raise BuildError(f"{p.parent.name}: malformed predictions.jsonl line {lineno} (mapping expected)")
+        records.append(rec)
+    return records
+
+
+def load_results(path: str | Path) -> dict[str, Any]:
+    p = Path(path)
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise BuildError(f"{p.parent.name}: malformed results.json ({e})")
+    except OSError as e:
+        raise BuildError(f"{p.parent.name}: cannot read results.json ({e})")
+    if not isinstance(data, dict):
+        raise BuildError(f"{p.parent.name}: malformed results.json (top-level mapping expected)")
+    return data
+
+
+def _normalize_group_table(raw: Any, slug: str, field: str) -> list[dict[str, Any]]:
+    if not isinstance(raw, dict) or not raw:
+        raise BuildError(f"{slug}: malformed results.json ({field!r} table missing or empty)")
+    rows: list[dict[str, Any]] = []
+    for name, stats in raw.items():
+        if not isinstance(stats, dict):
+            raise BuildError(f"{slug}: malformed results.json ({field}[{name!r}] not a mapping)")
+        n = stats.get("n")
+        correct = stats.get("correct")
+        if not isinstance(n, int) or not isinstance(correct, int) or n < 0 or correct < 0 or correct > n:
+            raise BuildError(f"{slug}: malformed results.json ({field}[{name!r}] has bad n/correct)")
+        rows.append({"name": str(name), "n": n, "correct": correct,
+                     "accuracy": (correct / n) if n else 0.0})
+    return rows
+
+
+def _sort_key_for_group(name: str) -> tuple[int, Any]:
+    try:
+        return (0, int(name))
+    except ValueError:
+        try:
+            return (0, float(name))
+        except ValueError:
+            return (1, name)
+
+
+def summarize_run(run_dir: str | Path) -> dict[str, Any]:
+    """Validate one completed run dir and derive its site record.
+
+    Raises :class:`BuildError` with a clearly-attributed message for any
+    malformed completed run.
+    """
+    run_path = Path(run_dir)
+    slug = run_path.name
+
+    snapshot = load_snapshot(run_path / "config.snapshot.yaml")
+    if not snapshot:
+        raise BuildError(f"{slug}: malformed config.snapshot.yaml (empty)")
+    results = load_results(run_path / "results.json")
+    records = read_predictions(run_path / "predictions.jsonl")
+    if not records:
+        raise BuildError(f"{slug}: malformed predictions.jsonl (no records)")
+
+    # --- prediction id validation ---------------------------------------
+    seen: set[str] = set()
+    for rec in records:
+        rid = rec.get("id")
+        if rid is None or (isinstance(rid, str) and rid == ""):
+            raise BuildError(f"{slug}: malformed predictions.jsonl (record missing id)")
+        key = str(rid)
+        if key in seen:
+            raise BuildError(f"{slug}: malformed predictions.jsonl (duplicate id {key!r})")
+        seen.add(key)
+
+    # --- headline counts --------------------------------------------------
+    total = results.get("num_items")
+    correct = results.get("num_correct")
+    accuracy = results.get("accuracy")
+    if not isinstance(total, int) or total <= 0:
+        raise BuildError(f"{slug}: malformed results.json (bad num_items {total!r})")
+    if not isinstance(correct, int) or correct < 0 or correct > total:
+        raise BuildError(f"{slug}: malformed results.json (bad num_correct {correct!r})")
+    if not isinstance(accuracy, (int, float)) or not math.isfinite(accuracy):
+        raise BuildError(f"{slug}: malformed results.json (bad accuracy {accuracy!r})")
+    if len(records) != total:
+        raise BuildError(
+            f"{slug}: predictions/results mismatch ({len(records)} prediction records "
+            f"vs num_items={total})"
+        )
+    if abs(float(accuracy) - correct / total) > 1e-6:
+        raise BuildError(
+            f"{slug}: malformed results.json (accuracy {accuracy!r} disagrees "
+            f"with num_correct/num_items={correct}/{total})"
+        )
+    accuracy = correct / total
+
+    # --- snapshot-derived conditions --------------------------------------
+    backend = snapshot.get("backend")
+    if backend is None:
+        backend = {}
+    if not isinstance(backend, dict):
+        raise BuildError(f"{slug}: malformed config.snapshot.yaml (backend not a mapping)")
+    generation = snapshot.get("generation")
+    if generation is None:
+        generation = {}
+    if not isinstance(generation, dict):
+        raise BuildError(f"{slug}: malformed config.snapshot.yaml (generation not a mapping)")
+    dataset = snapshot.get("dataset")
+    if dataset is None:
+        dataset = {}
+    if not isinstance(dataset, dict):
+        raise BuildError(f"{slug}: malformed config.snapshot.yaml (dataset not a mapping)")
+
+    model = backend.get("model") or results.get("model")
+    if not model or not str(model).strip():
+        raise BuildError(f"{slug}: malformed run (no model id in snapshot or results)")
+    model = str(model)
+    engine_opts = backend.get("engine_opts")
+    effort = find_reasoning_effort(engine_opts)
+    reasoning_mode = "provider-default" if effort is None else effort
+    category = "ablation" if effort == "none" else "primary"
+    short = short_model_label(model)
+    label = short if effort is None else f"{short} (reasoning effort: {effort})"
+
+    extra_body = None
+    if isinstance(engine_opts, dict):
+        extra_body = engine_opts.get("extra_body")
+
+    dataset_name = dataset.get("name")
+    dataset_revision = dataset.get("revision")
+    if dataset_revision is None:
+        dataset_revision = results.get("dataset_revision")
+
+    # --- groups ------------------------------------------------------------
+    by_domain = _normalize_group_table(results.get("by_class"), slug, "by_class")
+    by_domain.sort(key=lambda r: r["name"])
+    by_level = _normalize_group_table(results.get("by_level"), slug, "by_level")
+    by_level.sort(key=lambda r: _sort_key_for_group(r["name"]))
+
+    # --- answer quality -----------------------------------------------------
+    invalid = sum(1 for rec in records if not is_valid_answer(rec.get("predicted_answer")))
+    def _is_empty_raw(rec: dict[str, Any]) -> bool:
+        raw = rec.get("raw_output")
+        return not (isinstance(raw, str) and raw.strip() != "")
+
+    empty_raw = sum(1 for rec in records if _is_empty_raw(rec))
+
+    # --- latency --------------------------------------------------------------
+    latencies = [
+        float(rec["latency_ms"]) for rec in records
+        if isinstance(rec.get("latency_ms"), (int, float))
+        and not isinstance(rec.get("latency_ms"), bool)
+        and math.isfinite(float(rec["latency_ms"]))
+    ]
+    lo, hi = wilson_interval(correct, total)
+
+    return {
+        "slug": slug,
+        "path": f"runs/{slug}",
+        "model": model,
+        "label": label,
+        "timestamp": parse_run_timestamp(slug),
+        "backend": backend.get("family", results.get("backend")),
+        "provider": backend.get("api_provider"),
+        "endpoint": backend.get("endpoint"),
+        "reasoning_mode": reasoning_mode,
+        "reasoning_effort": effort,
+        "category": category,
+        "engine_extra_body": extra_body,
+        "max_new_tokens": generation.get("max_new_tokens"),
+        "prompt_template_hash": snapshot.get("prompt_template_hash"),
+        "dataset": {"name": dataset_name, "revision": dataset_revision},
+        "total": total,
+        "correct": correct,
+        "accuracy": accuracy,
+        "wilson_95": {"lo": round(lo, 6), "hi": round(hi, 6)},
+        "by_domain": by_domain,
+        "by_level": by_level,
+        "invalid": {"count": invalid, "rate": round(invalid / total, 6)},
+        "empty_raw_output": empty_raw,
+        "latency_ms": {
+            "n": len(latencies),
+            "median": median_of(latencies),
+            "p95": nearest_rank_percentile(latencies, 95),
+        },
+        "evidence": {
+            "snapshot": f"site/data/runs/{slug}/config.snapshot.yaml",
+            "results": f"site/data/runs/{slug}/results.json",
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Payload assembly
+# ---------------------------------------------------------------------------
+
+def build_payload(runs_dir: str | Path, generated_at: str | None = None) -> dict[str, Any]:
+    """Discover, validate and summarize every completed run.
+
+    Primary runs come first sorted by descending accuracy, then ablations
+    (each group: descending accuracy, slug ascending for full determinism).
+    """
+    completed, skipped = discover_runs(runs_dir)
+    summaries = [summarize_run(d) for d in completed]
+
+    totals = {s["total"] for s in summaries}
+    if len(totals) > 1:
+        detail = ", ".join(f"{s['slug']}={s['total']}" for s in summaries)
+        raise BuildError(f"inconsistent item counts across runs: {detail}")
+
+    summaries.sort(key=lambda s: (0 if s["category"] == "primary" else 1, -s["accuracy"], s["slug"]))
+
+    item_count = summaries[0]["total"] if summaries else None
+
+    dataset_groups: dict[str, Any] | None = None
+    dataset_meta: dict[str, Any] = {"name": None, "revision": None, "consistent": True}
+    if summaries:
+        names = {json.dumps(s["dataset"], sort_keys=True) for s in summaries}
+        dataset_meta = {
+            "name": summaries[0]["dataset"]["name"],
+            "revision": summaries[0]["dataset"]["revision"],
+            "consistent": len(names) == 1,
+        }
+        domain_sizes = [
+            json.dumps([[r["name"], r["n"]] for r in s["by_domain"]], sort_keys=True)
+            for s in summaries
+        ]
+        level_sizes = [
+            json.dumps([[r["name"], r["n"]] for r in s["by_level"]], sort_keys=True)
+            for s in summaries
+        ]
+        if len(set(domain_sizes)) == 1 and len(set(level_sizes)) == 1:
+            dataset_groups = {
+                "by_domain": [{"name": r["name"], "n": r["n"]} for r in summaries[0]["by_domain"]],
+                "by_level": [{"name": r["name"], "n": r["n"]} for r in summaries[0]["by_level"]],
+            }
+
+    if generated_at is None:
+        generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return {
+        "generated_at": generated_at,
+        "generator": "site/build.py",
+        "item_count": item_count,
+        "dataset": dataset_meta,
+        "dataset_groups": dataset_groups,
+        "runs": summaries,
+        "skipped": sorted(skipped, key=lambda s: s["slug"]),
+    }
+
+
+def write_outputs(
+    payload: dict[str, Any],
+    root: str | Path,
+    *,
+    out_path: str | Path | None = None,
+    data_dir: str | Path | None = None,
+    runs_dir: str | Path | None = None,
+) -> tuple[Path, Path]:
+    """Write ``site/results.json`` and refresh publish-safe evidence copies.
+
+    Only ``config.snapshot.yaml`` and ``results.json`` are copied per run;
+    raw predictions and logs are never published.
+    """
+    root_path = Path(root)
+    out = Path(out_path) if out_path else root_path / "site" / "results.json"
+    data_runs = Path(data_dir) if data_dir else root_path / "site" / "data" / "runs"
+    runs_path = Path(runs_dir) if runs_dir else root_path / "runs"
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+
+    if data_runs.exists():
+        shutil.rmtree(data_runs)
+    for run in payload.get("runs", []):
+        slug = run["slug"]
+        dest = data_runs / slug
+        dest.mkdir(parents=True, exist_ok=True)
+        for fname in PUBLISH_SAFE_FILES:
+            src = runs_path / slug / fname
+            shutil.copyfile(src, dest / fname)
+    return out, data_runs
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Build deterministic site data for the KoBALT-700 benchmark.")
+    parser.add_argument("--runs-dir", default=None, help="runs directory (default: <repo>/runs)")
+    parser.add_argument("--out", default=None, help="results.json path (default: <repo>/site/results.json)")
+    parser.add_argument("--data-dir", default=None, help="evidence dir (default: <repo>/site/data/runs)")
+    args = parser.parse_args(argv)
+
+    root = repo_root()
+    runs_dir = Path(args.runs_dir) if args.runs_dir else root / "runs"
+    try:
+        payload = build_payload(runs_dir)
+    except BuildError as e:
+        print(f"site/build.py: error: {e}", file=sys.stderr)
+        return 1
+
+    out_path = Path(args.out) if args.out else root / "site" / "results.json"
+    data_dir = Path(args.data_dir) if args.data_dir else root / "site" / "data" / "runs"
+    write_outputs(payload, root, out_path=out_path, data_dir=data_dir, runs_dir=runs_dir)
+
+    n_primary = sum(1 for r in payload["runs"] if r["category"] == "primary")
+    n_ablation = len(payload["runs"]) - n_primary
+    print(
+        f"site/build.py: {len(payload['runs'])} runs "
+        f"({n_primary} primary, {n_ablation} ablation), "
+        f"{len(payload['skipped'])} skipped -> {out_path}"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

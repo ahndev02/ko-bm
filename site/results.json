@@ -1,0 +1,812 @@
+{
+  "generated_at": "2026-09-19T05:42:34Z",
+  "generator": "site/build.py",
+  "item_count": 700,
+  "dataset": {
+    "name": "snunlp/KoBALT-700",
+    "revision": "0.0.0",
+    "consistent": true
+  },
+  "dataset_groups": {
+    "by_domain": [
+      {
+        "name": "Morphology",
+        "n": 42
+      },
+      {
+        "name": "Phonetics/Phonology",
+        "n": 62
+      },
+      {
+        "name": "Pragmatics",
+        "n": 81
+      },
+      {
+        "name": "Semantics",
+        "n": 215
+      },
+      {
+        "name": "Syntax",
+        "n": 300
+      }
+    ],
+    "by_level": [
+      {
+        "name": "1",
+        "n": 182
+      },
+      {
+        "name": "2",
+        "n": 220
+      },
+      {
+        "name": "3",
+        "n": 298
+      }
+    ]
+  },
+  "runs": [
+    {
+      "slug": "run-20260919-023453-gpt-5.6-sol-floor",
+      "path": "runs/run-20260919-023453-gpt-5.6-sol-floor",
+      "model": "openai/gpt-5.6-sol:floor",
+      "label": "gpt-5.6-sol:floor",
+      "timestamp": "2026-09-19T02:34:53Z",
+      "backend": "api",
+      "provider": "openai",
+      "endpoint": "https://openrouter.ai/api/v1",
+      "reasoning_mode": "provider-default",
+      "reasoning_effort": null,
+      "category": "primary",
+      "engine_extra_body": null,
+      "max_new_tokens": 2048,
+      "prompt_template_hash": "3941207196edd4239a011e10649c790ed79a747490238330c32b2a2ed35383e1",
+      "dataset": {
+        "name": "snunlp/KoBALT-700",
+        "revision": "0.0.0"
+      },
+      "total": 700,
+      "correct": 599,
+      "accuracy": 0.8557142857142858,
+      "wilson_95": {
+        "lo": 0.827741,
+        "hi": 0.879805
+      },
+      "by_domain": [
+        {
+          "name": "Morphology",
+          "n": 42,
+          "correct": 33,
+          "accuracy": 0.7857142857142857
+        },
+        {
+          "name": "Phonetics/Phonology",
+          "n": 62,
+          "correct": 55,
+          "accuracy": 0.8870967741935484
+        },
+        {
+          "name": "Pragmatics",
+          "n": 81,
+          "correct": 71,
+          "accuracy": 0.8765432098765432
+        },
+        {
+          "name": "Semantics",
+          "n": 215,
+          "correct": 174,
+          "accuracy": 0.8093023255813954
+        },
+        {
+          "name": "Syntax",
+          "n": 300,
+          "correct": 266,
+          "accuracy": 0.8866666666666667
+        }
+      ],
+      "by_level": [
+        {
+          "name": "1",
+          "n": 182,
+          "correct": 177,
+          "accuracy": 0.9725274725274725
+        },
+        {
+          "name": "2",
+          "n": 220,
+          "correct": 208,
+          "accuracy": 0.9454545454545454
+        },
+        {
+          "name": "3",
+          "n": 298,
+          "correct": 214,
+          "accuracy": 0.7181208053691275
+        }
+      ],
+      "invalid": {
+        "count": 29,
+        "rate": 0.041429
+      },
+      "empty_raw_output": 29,
+      "latency_ms": {
+        "n": 700,
+        "median": 4903.5,
+        "p95": 23300.0
+      },
+      "evidence": {
+        "snapshot": "site/data/runs/run-20260919-023453-gpt-5.6-sol-floor/config.snapshot.yaml",
+        "results": "site/data/runs/run-20260919-023453-gpt-5.6-sol-floor/results.json"
+      }
+    },
+    {
+      "slug": "run-20260919-043608-gemini-3.8-flash-floor",
+      "path": "runs/run-20260919-043608-gemini-3.8-flash-floor",
+      "model": "google/gemini-3.8-flash:floor",
+      "label": "gemini-3.8-flash:floor",
+      "timestamp": "2026-09-19T04:36:08Z",
+      "backend": "api",
+      "provider": "openai",
+      "endpoint": "https://openrouter.ai/api/v1",
+      "reasoning_mode": "provider-default",
+      "reasoning_effort": null,
+      "category": "primary",
+      "engine_extra_body": null,
+      "max_new_tokens": 2048,
+      "prompt_template_hash": "3941207196edd4239a011e10649c790ed79a747490238330c32b2a2ed35383e1",
+      "dataset": {
+        "name": "snunlp/KoBALT-700",
+        "revision": "0.0.0"
+      },
+      "total": 700,
+      "correct": 543,
+      "accuracy": 0.7757142857142857,
+      "wilson_95": {
+        "lo": 0.743357,
+        "hi": 0.805062
+      },
+      "by_domain": [
+        {
+          "name": "Morphology",
+          "n": 42,
+          "correct": 32,
+          "accuracy": 0.7619047619047619
+        },
+        {
+          "name": "Phonetics/Phonology",
+          "n": 62,
+          "correct": 50,
+          "accuracy": 0.8064516129032258
+        },
+        {
+          "name": "Pragmatics",
+          "n": 81,
+          "correct": 66,
+          "accuracy": 0.8148148148148148
+        },
+        {
+          "name": "Semantics",
+          "n": 215,
+          "correct": 165,
+          "accuracy": 0.7674418604651163
+        },
+        {
+          "name": "Syntax",
+          "n": 300,
+          "correct": 230,
+          "accuracy": 0.7666666666666667
+        }
+      ],
+      "by_level": [
+        {
+          "name": "1",
+          "n": 182,
+          "correct": 176,
+          "accuracy": 0.967032967032967
+        },
+        {
+          "name": "2",
+          "n": 220,
+          "correct": 188,
+          "accuracy": 0.8545454545454545
+        },
+        {
+          "name": "3",
+          "n": 298,
+          "correct": 179,
+          "accuracy": 0.6006711409395973
+        }
+      ],
+      "invalid": {
+        "count": 117,
+        "rate": 0.167143
+      },
+      "empty_raw_output": 6,
+      "latency_ms": {
+        "n": 700,
+        "median": 5004.5,
+        "p95": 9309.0
+      },
+      "evidence": {
+        "snapshot": "site/data/runs/run-20260919-043608-gemini-3.8-flash-floor/config.snapshot.yaml",
+        "results": "site/data/runs/run-20260919-043608-gemini-3.8-flash-floor/results.json"
+      }
+    },
+    {
+      "slug": "run-20260918-165049-muse-spark-1.3-contributor",
+      "path": "runs/run-20260918-165049-muse-spark-1.3-contributor",
+      "model": "meta/muse-spark-1.3-contributor",
+      "label": "muse-spark-1.3-contributor (reasoning effort: minimal)",
+      "timestamp": "2026-09-18T16:50:49Z",
+      "backend": "api",
+      "provider": "openai",
+      "endpoint": "https://openrouter.ai/api/v1",
+      "reasoning_mode": "minimal",
+      "reasoning_effort": "minimal",
+      "category": "primary",
+      "engine_extra_body": {
+        "reasoning": {
+          "effort": "minimal"
+        }
+      },
+      "max_new_tokens": 2048,
+      "prompt_template_hash": "3941207196edd4239a011e10649c790ed79a747490238330c32b2a2ed35383e1",
+      "dataset": {
+        "name": "snunlp/KoBALT-700",
+        "revision": "0.0.0"
+      },
+      "total": 700,
+      "correct": 525,
+      "accuracy": 0.75,
+      "wilson_95": {
+        "lo": 0.716616,
+        "hi": 0.780655
+      },
+      "by_domain": [
+        {
+          "name": "Morphology",
+          "n": 42,
+          "correct": 20,
+          "accuracy": 0.47619047619047616
+        },
+        {
+          "name": "Phonetics/Phonology",
+          "n": 62,
+          "correct": 38,
+          "accuracy": 0.6129032258064516
+        },
+        {
+          "name": "Pragmatics",
+          "n": 81,
+          "correct": 63,
+          "accuracy": 0.7777777777777778
+        },
+        {
+          "name": "Semantics",
+          "n": 215,
+          "correct": 158,
+          "accuracy": 0.7348837209302326
+        },
+        {
+          "name": "Syntax",
+          "n": 300,
+          "correct": 246,
+          "accuracy": 0.82
+        }
+      ],
+      "by_level": [
+        {
+          "name": "1",
+          "n": 182,
+          "correct": 173,
+          "accuracy": 0.9505494505494505
+        },
+        {
+          "name": "2",
+          "n": 220,
+          "correct": 188,
+          "accuracy": 0.8545454545454545
+        },
+        {
+          "name": "3",
+          "n": 298,
+          "correct": 164,
+          "accuracy": 0.5503355704697986
+        }
+      ],
+      "invalid": {
+        "count": 26,
+        "rate": 0.037143
+      },
+      "empty_raw_output": 20,
+      "latency_ms": {
+        "n": 700,
+        "median": 10427.0,
+        "p95": 28092.0
+      },
+      "evidence": {
+        "snapshot": "site/data/runs/run-20260918-165049-muse-spark-1.3-contributor/config.snapshot.yaml",
+        "results": "site/data/runs/run-20260918-165049-muse-spark-1.3-contributor/results.json"
+      }
+    },
+    {
+      "slug": "run-20260918-162449-gpt-5.6-luna-floor",
+      "path": "runs/run-20260918-162449-gpt-5.6-luna-floor",
+      "model": "openai/gpt-5.6-luna:floor",
+      "label": "gpt-5.6-luna:floor",
+      "timestamp": "2026-09-18T16:24:49Z",
+      "backend": "api",
+      "provider": "openai",
+      "endpoint": "https://openrouter.ai/api/v1",
+      "reasoning_mode": "provider-default",
+      "reasoning_effort": null,
+      "category": "primary",
+      "engine_extra_body": null,
+      "max_new_tokens": 2048,
+      "prompt_template_hash": "3941207196edd4239a011e10649c790ed79a747490238330c32b2a2ed35383e1",
+      "dataset": {
+        "name": "snunlp/KoBALT-700",
+        "revision": "0.0.0"
+      },
+      "total": 700,
+      "correct": 513,
+      "accuracy": 0.7328571428571429,
+      "wilson_95": {
+        "lo": 0.698873,
+        "hi": 0.7643
+      },
+      "by_domain": [
+        {
+          "name": "Morphology",
+          "n": 42,
+          "correct": 29,
+          "accuracy": 0.6904761904761905
+        },
+        {
+          "name": "Phonetics/Phonology",
+          "n": 62,
+          "correct": 45,
+          "accuracy": 0.7258064516129032
+        },
+        {
+          "name": "Pragmatics",
+          "n": 81,
+          "correct": 52,
+          "accuracy": 0.6419753086419753
+        },
+        {
+          "name": "Semantics",
+          "n": 215,
+          "correct": 161,
+          "accuracy": 0.7488372093023256
+        },
+        {
+          "name": "Syntax",
+          "n": 300,
+          "correct": 226,
+          "accuracy": 0.7533333333333333
+        }
+      ],
+      "by_level": [
+        {
+          "name": "1",
+          "n": 182,
+          "correct": 174,
+          "accuracy": 0.9560439560439561
+        },
+        {
+          "name": "2",
+          "n": 220,
+          "correct": 187,
+          "accuracy": 0.85
+        },
+        {
+          "name": "3",
+          "n": 298,
+          "correct": 152,
+          "accuracy": 0.5100671140939598
+        }
+      ],
+      "invalid": {
+        "count": 83,
+        "rate": 0.118571
+      },
+      "empty_raw_output": 82,
+      "latency_ms": {
+        "n": 700,
+        "median": 9203.5,
+        "p95": 38892.0
+      },
+      "evidence": {
+        "snapshot": "site/data/runs/run-20260918-162449-gpt-5.6-luna-floor/config.snapshot.yaml",
+        "results": "site/data/runs/run-20260918-162449-gpt-5.6-luna-floor/results.json"
+      }
+    },
+    {
+      "slug": "run-20260917-032809-gemma-4-26B-A4B-it-qat-GGUF",
+      "path": "runs/run-20260917-032809-gemma-4-26B-A4B-it-qat-GGUF",
+      "model": "unsloth/gemma-4-26B-A4B-it-qat-GGUF",
+      "label": "gemma-4-26B-A4B-it-qat-GGUF",
+      "timestamp": "2026-09-17T03:28:09Z",
+      "backend": "api",
+      "provider": "openai",
+      "endpoint": "http://192.168.35.94:8888/v1",
+      "reasoning_mode": "provider-default",
+      "reasoning_effort": null,
+      "category": "primary",
+      "engine_extra_body": {
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "max_new_tokens": 2048,
+      "prompt_template_hash": "3941207196edd4239a011e10649c790ed79a747490238330c32b2a2ed35383e1",
+      "dataset": {
+        "name": "snunlp/KoBALT-700",
+        "revision": "0.0.0"
+      },
+      "total": 700,
+      "correct": 411,
+      "accuracy": 0.5871428571428572,
+      "wilson_95": {
+        "lo": 0.55029,
+        "hi": 0.623044
+      },
+      "by_domain": [
+        {
+          "name": "Morphology",
+          "n": 42,
+          "correct": 20,
+          "accuracy": 0.47619047619047616
+        },
+        {
+          "name": "Phonetics/Phonology",
+          "n": 62,
+          "correct": 27,
+          "accuracy": 0.43548387096774194
+        },
+        {
+          "name": "Pragmatics",
+          "n": 81,
+          "correct": 36,
+          "accuracy": 0.4444444444444444
+        },
+        {
+          "name": "Semantics",
+          "n": 215,
+          "correct": 134,
+          "accuracy": 0.6232558139534884
+        },
+        {
+          "name": "Syntax",
+          "n": 300,
+          "correct": 194,
+          "accuracy": 0.6466666666666666
+        }
+      ],
+      "by_level": [
+        {
+          "name": "1",
+          "n": 182,
+          "correct": 169,
+          "accuracy": 0.9285714285714286
+        },
+        {
+          "name": "2",
+          "n": 220,
+          "correct": 160,
+          "accuracy": 0.7272727272727273
+        },
+        {
+          "name": "3",
+          "n": 298,
+          "correct": 82,
+          "accuracy": 0.2751677852348993
+        }
+      ],
+      "invalid": {
+        "count": 103,
+        "rate": 0.147143
+      },
+      "empty_raw_output": 0,
+      "latency_ms": {
+        "n": 700,
+        "median": 76996.5,
+        "p95": 199981.0
+      },
+      "evidence": {
+        "snapshot": "site/data/runs/run-20260917-032809-gemma-4-26B-A4B-it-qat-GGUF/config.snapshot.yaml",
+        "results": "site/data/runs/run-20260917-032809-gemma-4-26B-A4B-it-qat-GGUF/results.json"
+      }
+    },
+    {
+      "slug": "run-20260918-125513-solar-pro4",
+      "path": "runs/run-20260918-125513-solar-pro4",
+      "model": "solar-pro4",
+      "label": "solar-pro4",
+      "timestamp": "2026-09-18T12:55:13Z",
+      "backend": "api",
+      "provider": "openai",
+      "endpoint": "https://api.upstage.ai/v1",
+      "reasoning_mode": "provider-default",
+      "reasoning_effort": null,
+      "category": "primary",
+      "engine_extra_body": null,
+      "max_new_tokens": 2048,
+      "prompt_template_hash": "3941207196edd4239a011e10649c790ed79a747490238330c32b2a2ed35383e1",
+      "dataset": {
+        "name": "snunlp/KoBALT-700",
+        "revision": "0.0.0"
+      },
+      "total": 700,
+      "correct": 409,
+      "accuracy": 0.5842857142857143,
+      "wilson_95": {
+        "lo": 0.547412,
+        "hi": 0.620239
+      },
+      "by_domain": [
+        {
+          "name": "Morphology",
+          "n": 42,
+          "correct": 23,
+          "accuracy": 0.5476190476190477
+        },
+        {
+          "name": "Phonetics/Phonology",
+          "n": 62,
+          "correct": 21,
+          "accuracy": 0.3387096774193548
+        },
+        {
+          "name": "Pragmatics",
+          "n": 81,
+          "correct": 39,
+          "accuracy": 0.48148148148148145
+        },
+        {
+          "name": "Semantics",
+          "n": 215,
+          "correct": 138,
+          "accuracy": 0.641860465116279
+        },
+        {
+          "name": "Syntax",
+          "n": 300,
+          "correct": 188,
+          "accuracy": 0.6266666666666667
+        }
+      ],
+      "by_level": [
+        {
+          "name": "1",
+          "n": 182,
+          "correct": 164,
+          "accuracy": 0.9010989010989011
+        },
+        {
+          "name": "2",
+          "n": 220,
+          "correct": 160,
+          "accuracy": 0.7272727272727273
+        },
+        {
+          "name": "3",
+          "n": 298,
+          "correct": 85,
+          "accuracy": 0.28523489932885904
+        }
+      ],
+      "invalid": {
+        "count": 23,
+        "rate": 0.032857
+      },
+      "empty_raw_output": 0,
+      "latency_ms": {
+        "n": 700,
+        "median": 7158.0,
+        "p95": 28401.0
+      },
+      "evidence": {
+        "snapshot": "site/data/runs/run-20260918-125513-solar-pro4/config.snapshot.yaml",
+        "results": "site/data/runs/run-20260918-125513-solar-pro4/results.json"
+      }
+    },
+    {
+      "slug": "run-20260918-111541-solar-mini4-preview",
+      "path": "runs/run-20260918-111541-solar-mini4-preview",
+      "model": "solar-mini4-preview",
+      "label": "solar-mini4-preview",
+      "timestamp": "2026-09-18T11:15:41Z",
+      "backend": "api",
+      "provider": "openai",
+      "endpoint": "https://api.upstage.ai/v1",
+      "reasoning_mode": "provider-default",
+      "reasoning_effort": null,
+      "category": "primary",
+      "engine_extra_body": null,
+      "max_new_tokens": 2048,
+      "prompt_template_hash": "3941207196edd4239a011e10649c790ed79a747490238330c32b2a2ed35383e1",
+      "dataset": {
+        "name": "snunlp/KoBALT-700",
+        "revision": "0.0.0"
+      },
+      "total": 700,
+      "correct": 279,
+      "accuracy": 0.3985714285714286,
+      "wilson_95": {
+        "lo": 0.36295,
+        "hi": 0.435301
+      },
+      "by_domain": [
+        {
+          "name": "Morphology",
+          "n": 42,
+          "correct": 9,
+          "accuracy": 0.21428571428571427
+        },
+        {
+          "name": "Phonetics/Phonology",
+          "n": 62,
+          "correct": 14,
+          "accuracy": 0.22580645161290322
+        },
+        {
+          "name": "Pragmatics",
+          "n": 81,
+          "correct": 17,
+          "accuracy": 0.20987654320987653
+        },
+        {
+          "name": "Semantics",
+          "n": 215,
+          "correct": 116,
+          "accuracy": 0.5395348837209303
+        },
+        {
+          "name": "Syntax",
+          "n": 300,
+          "correct": 123,
+          "accuracy": 0.41
+        }
+      ],
+      "by_level": [
+        {
+          "name": "1",
+          "n": 182,
+          "correct": 143,
+          "accuracy": 0.7857142857142857
+        },
+        {
+          "name": "2",
+          "n": 220,
+          "correct": 101,
+          "accuracy": 0.4590909090909091
+        },
+        {
+          "name": "3",
+          "n": 298,
+          "correct": 35,
+          "accuracy": 0.1174496644295302
+        }
+      ],
+      "invalid": {
+        "count": 173,
+        "rate": 0.247143
+      },
+      "empty_raw_output": 0,
+      "latency_ms": {
+        "n": 700,
+        "median": 3308.5,
+        "p95": 12356.0
+      },
+      "evidence": {
+        "snapshot": "site/data/runs/run-20260918-111541-solar-mini4-preview/config.snapshot.yaml",
+        "results": "site/data/runs/run-20260918-111541-solar-mini4-preview/results.json"
+      }
+    },
+    {
+      "slug": "run-20260919-015306-gpt-5.6-luna-floor",
+      "path": "runs/run-20260919-015306-gpt-5.6-luna-floor",
+      "model": "openai/gpt-5.6-luna:floor",
+      "label": "gpt-5.6-luna:floor (reasoning effort: none)",
+      "timestamp": "2026-09-19T01:53:06Z",
+      "backend": "api",
+      "provider": "openai",
+      "endpoint": "https://openrouter.ai/api/v1",
+      "reasoning_mode": "none",
+      "reasoning_effort": "none",
+      "category": "ablation",
+      "engine_extra_body": {
+        "reasoning": {
+          "effort": "none"
+        }
+      },
+      "max_new_tokens": 2048,
+      "prompt_template_hash": "3941207196edd4239a011e10649c790ed79a747490238330c32b2a2ed35383e1",
+      "dataset": {
+        "name": "snunlp/KoBALT-700",
+        "revision": "0.0.0"
+      },
+      "total": 700,
+      "correct": 347,
+      "accuracy": 0.4957142857142857,
+      "wilson_95": {
+        "lo": 0.4588,
+        "hi": 0.532676
+      },
+      "by_domain": [
+        {
+          "name": "Morphology",
+          "n": 42,
+          "correct": 19,
+          "accuracy": 0.4523809523809524
+        },
+        {
+          "name": "Phonetics/Phonology",
+          "n": 62,
+          "correct": 22,
+          "accuracy": 0.3548387096774194
+        },
+        {
+          "name": "Pragmatics",
+          "n": 81,
+          "correct": 37,
+          "accuracy": 0.4567901234567901
+        },
+        {
+          "name": "Semantics",
+          "n": 215,
+          "correct": 129,
+          "accuracy": 0.6
+        },
+        {
+          "name": "Syntax",
+          "n": 300,
+          "correct": 140,
+          "accuracy": 0.4666666666666667
+        }
+      ],
+      "by_level": [
+        {
+          "name": "1",
+          "n": 182,
+          "correct": 162,
+          "accuracy": 0.8901098901098901
+        },
+        {
+          "name": "2",
+          "n": 220,
+          "correct": 128,
+          "accuracy": 0.5818181818181818
+        },
+        {
+          "name": "3",
+          "n": 298,
+          "correct": 57,
+          "accuracy": 0.1912751677852349
+        }
+      ],
+      "invalid": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "empty_raw_output": 0,
+      "latency_ms": {
+        "n": 700,
+        "median": 1889.5,
+        "p95": 5326.0
+      },
+      "evidence": {
+        "snapshot": "site/data/runs/run-20260919-015306-gpt-5.6-luna-floor/config.snapshot.yaml",
+        "results": "site/data/runs/run-20260919-015306-gpt-5.6-luna-floor/results.json"
+      }
+    }
+  ],
+  "skipped": [
+    {
+      "slug": "run-20260918-161854-muse-spark-1.3-contributor",
+      "reason": "missing: results.json"
+    }
+  ]
+}

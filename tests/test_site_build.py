@@ -359,6 +359,146 @@ def test_malformed_snapshot_fails(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# YAML subset: sequences
+# ---------------------------------------------------------------------------
+
+PROVIDER_LIST_SNAPSHOT = """\
+backend:
+  family: api
+  model: google/gemma-4-31b-it
+  endpoint: https://openrouter.ai/api/v1
+  engine_opts:
+    extra_body:
+      provider:
+        only:
+        - deepinfra/turbo
+  max_retries: 3
+  concurrency: 1
+  api_key_env: OPENAI_API_KEY
+  api_provider: openai
+generation:
+  do_sample: false
+  max_new_tokens: 2048
+prompt:
+  system: test system prompt
+  user_template: 'line one
+    line two'
+extraction:
+  regex: test-regex
+prompt_template_hash: hash-1
+dataset:
+  name: test/Dataset
+  revision: rev-1
+"""
+
+
+def test_nested_provider_only_list_end_to_end(tmp_path):
+    runs = tmp_path / "runs"
+    rundir = runs / "run-20260920-072521-gemma-4-31b-it"
+    rundir.mkdir(parents=True)
+    recs = three_records()
+    (rundir / "config.snapshot.yaml").write_text(PROVIDER_LIST_SNAPSHOT, encoding="utf-8")
+    with (rundir / "predictions.jsonl").open("w", encoding="utf-8") as f:
+        for rec in recs:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    (rundir / "results.json").write_text(
+        json.dumps(results_for(recs), ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    summary = build.summarize_run(rundir)
+    assert summary["model"] == "google/gemma-4-31b-it"
+    assert summary["category"] == "primary"
+    assert summary["reasoning_mode"] == "provider-default"
+    assert summary["engine_extra_body"] == {"provider": {"only": ["deepinfra/turbo"]}}
+    assert summary["timestamp"] == "2026-09-20T07:25:21Z"
+    payload = build.build_payload(runs, generated_at="2026-01-01T00:00:00Z")
+    assert [r["slug"] for r in payload["runs"]] == ["run-20260920-072521-gemma-4-31b-it"]
+    assert payload["runs"][0]["engine_extra_body"] == {"provider": {"only": ["deepinfra/turbo"]}}
+
+
+def test_yaml_sequences_preserve_scalars():
+    doc = (
+        "name: plain\n"
+        "nothing: null\n"
+        "flag: true\n"
+        "count: 42\n"
+        "ratio: 1.5\n"
+        "quoted: 'a: b'\n"
+        "items:\n"
+        "- one\n"
+        "- 2\n"
+        "- null\n"
+        "- false\n"
+        "- 'quoted: scalar'\n"
+        "nested:\n"
+        "  deep:\n"
+        "  - a\n"
+        "  - b\n"
+        "after: done\n"
+    )
+    assert build.parse_simple_yaml(doc) == {
+        "name": "plain",
+        "nothing": None,
+        "flag": True,
+        "count": 42,
+        "ratio": 1.5,
+        "quoted": "a: b",
+        "items": ["one", 2, None, False, "quoted: scalar"],
+        "nested": {"deep": ["a", "b"]},
+        "after": "done",
+    }
+
+
+def test_yaml_sequence_in_sequence_and_map_in_sequence():
+    doc = "matrix:\n- - a\n  - b\n- - c\npeople:\n- name: kim\n  level: 3\n- name: lee\n"
+    assert build.parse_simple_yaml(doc) == {
+        "matrix": [["a", "b"], ["c"]],
+        "people": [{"name": "kim", "level": 3}, {"name": "lee"}],
+    }
+
+
+def test_yaml_single_quoted_folding():
+    doc = "key: 'first second\n  continued here\n\n  new paragraph\n\n  '\n"
+    assert build.parse_simple_yaml(doc) == {
+        "key": "first second continued here\nnew paragraph\n"
+    }
+    assert build.parse_simple_yaml("a: 'x'\n") == {"a": "x"}
+    assert build.parse_simple_yaml("a: 'it''s'\n") == {"a": "it's"}
+
+
+def test_yaml_quoted_scalar_starting_on_next_line():
+    doc = "prompt:\n  user_template:\n    'line one\n    line two'\n  other: 1\n"
+    assert build.parse_simple_yaml(doc) == {
+        "prompt": {"user_template": "line one line two", "other": 1}
+    }
+
+
+def test_yaml_malformed_list_mapping_mixtures():
+    bad_docs = [
+        # list item with no owning key inside a mapping block
+        "a: 1\n- x\n",
+        # indented block under a scalar value
+        "a: 1\n  b: 2\n",
+        # indented block under a scalar list item
+        "key:\n- a\n  b: 2\n",
+        # inconsistent list indentation
+        "key:\n  - a\n   - b\n",
+        # mapping entry at list indent after a sequence (stray key)
+        "key:\n  - a\n  stray: 1\n",
+        # duplicate keys
+        "a: 1\na: 2\n",
+        # duplicate keys inside a sequence mapping item
+        "items:\n- name: x\n  name: y\n",
+        # non-mapping line
+        "just some text\n",
+        # tab indentation
+        "a:\n\t- x\n",
+    ]
+    for doc in bad_docs:
+        with pytest.raises(BuildError, match="malformed snapshot"):
+            build.parse_simple_yaml(doc)
+
+
+# ---------------------------------------------------------------------------
 # determinism + evidence outputs
 # ---------------------------------------------------------------------------
 

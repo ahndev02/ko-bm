@@ -64,7 +64,6 @@ WILSON_Z = 1.96  # 95% two-sided normal quantile
 _RUN_DIR_RE = re.compile(
     r"^run-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})-(.+)$"
 )
-_MAPPING_RE = re.compile(r"^([^:]+):(?:\s+(.*?))?\s*$")
 
 
 class BuildError(Exception):
@@ -140,58 +139,305 @@ def _consume_single_quoted(first: str, lines: list[str], idx: int) -> tuple[str,
         i += 1
 
 
-def parse_simple_yaml(text: str) -> dict[str, Any]:
-    """Parse the indentation-based mapping subset written by ``yaml.safe_dump``.
-
-    Supports nested mappings, null/bool/int/float scalars, single-quoted
-    (possibly multi-line) scalars and plain scalars. Lists are not
-    supported and raise :class:`BuildError`.
-    """
-    root: dict[str, Any] = {}
-    stack: list[tuple[int, dict[str, Any]]] = [(-1, root)]
-    lines = text.splitlines()
-    i = 0
+def _significant(lines: list[str], i: int) -> int | None:
+    """Index of the next non-blank, non-comment line at/after ``i``."""
     while i < len(lines):
-        raw = lines[i]
+        stripped = lines[i].strip()
+        if stripped and not stripped.startswith("#"):
+            return i
         i += 1
-        if not raw.strip() or raw.strip().startswith("#"):
-            continue
-        if raw.lstrip().startswith("- "):
-            raise BuildError(f"malformed snapshot: list items not supported: {raw.strip()[:60]!r}")
-        indent = len(raw) - len(raw.lstrip(" "))
+    return None
+
+
+def _indent_of(raw: str) -> int:
+    """Space-indent width; tabs are rejected (they misparse silently)."""
+    stripped_all = raw.lstrip()
+    leading = raw[: len(raw) - len(stripped_all)]
+    if "\t" in leading:
+        raise BuildError(f"malformed snapshot: tab indentation not supported: {raw.strip()[:60]!r}")
+    return len(raw) - len(raw.lstrip(" "))
+
+
+def _is_dash_item(stripped: str) -> bool:
+    return stripped == "-" or stripped.startswith("- ") or stripped.startswith("-\t")
+
+
+def _split_key_value(stripped: str) -> tuple[str, str] | None:
+    """Split ``key: value`` on the first colon followed by space/tab or EOL.
+
+    Returns None when the line is not mapping-like, so values containing
+    ':' (URLs, timestamps, ...) survive intact.
+    """
+    for pos, ch in enumerate(stripped):
+        if ch == ":" and (pos + 1 == len(stripped) or stripped[pos + 1] in " \t"):
+            return stripped[:pos].strip(), stripped[pos + 1 :].strip()
+    return None
+
+
+def _parse_quoted_value(rest: str, lines: list[str], i: int) -> tuple[Any, int]:
+    buf, next_i = _consume_single_quoted(rest, lines, i)
+    return _fold_single_quoted(buf), next_i
+
+
+def _fold_single_quoted(buf: str) -> str:
+    """Fold a single-quoted (possibly multi-line) scalar per YAML rules.
+
+    ``buf`` starts with the opening quote and ends with the closing quote
+    (plus trailing whitespace). Line breaks fold to a space; each blank
+    line adds one newline; leading/trailing blank lines vanish. ``''``
+    unescapes to ``'``.
+    """
+    text = buf.rstrip()
+    assert text.endswith("'")  # guaranteed by _consume_single_quoted
+    parts = text[1:-1].split("\n")
+    if parts and parts[-1].strip() == "":
+        parts.pop()  # closing-quote line carries no content
+    chunks: list[str] = []
+    cur: list[str] = []
+    for line in parts:
+        s = line.strip()
+        if s == "":
+            if cur:
+                chunks.append(" ".join(cur))
+                cur = []
+                chunks.append("\n")
+            elif chunks:
+                chunks.append("\n")
+        else:
+            cur.append(s)
+    if cur:
+        chunks.append(" ".join(cur))
+    return "".join(chunks).replace("''", "'")
+
+
+def _reject_nested_block(lines: list[str], i: int, parent_indent: int, context: str) -> None:
+    """Fail when a deeper-indented block follows a scalar value."""
+    nxt = _significant(lines, i)
+    if nxt is not None and _indent_of(lines[nxt]) > parent_indent:
+        raise BuildError(
+            f"malformed snapshot: unexpected indented block after {context}: "
+            f"{lines[nxt].strip()[:60]!r}"
+        )
+
+
+def _parse_nested_or_empty(lines: list[str], i: int, parent_indent: int) -> tuple[Any, int]:
+    """Parse the nested block owned by an empty ``key:`` / ``-`` / ``- key:``.
+
+    A ``-`` item at the same indent as the owning key is accepted (block
+    sequences may sit at the parent key's level); anything else that is
+    not deeper-indented means the key/item is an empty mapping.
+    """
+    nxt = _significant(lines, i)
+    if nxt is None:
+        return {}, i
+    raw = lines[nxt]
+    child_indent = _indent_of(raw)
+    stripped = raw.strip()
+    if _is_dash_item(stripped):
+        if child_indent >= parent_indent:
+            return _parse_sequence(lines, nxt, child_indent)
+        return {}, i
+    if child_indent > parent_indent:
+        if stripped.startswith("'"):
+            # Quoted scalar owned by the key but starting on the next line.
+            value, i = _parse_quoted_value(stripped, lines, nxt + 1)
+            _reject_nested_block(lines, i, child_indent, "quoted value")
+            return value, i
+        if stripped.startswith('"'):
+            if not (len(stripped) >= 2 and stripped.endswith('"')):
+                raise BuildError(
+                    "malformed snapshot: unterminated quoted scalar: "
+                    f"{stripped[:60]!r}"
+                )
+            value = _parse_scalar(stripped)
+            _reject_nested_block(lines, i, child_indent, "quoted value")
+            return value, i
+        if _split_key_value(stripped) is not None:
+            return _parse_mapping(lines, nxt, child_indent)
+    return {}, i
+
+
+def _parse_mapping(lines: list[str], i: int, indent: int) -> tuple[dict[str, Any], int]:
+    mapping: dict[str, Any] = {}
+    while True:
+        nxt = _significant(lines, i)
+        if nxt is None:
+            return mapping, len(lines)
+        raw = lines[nxt]
+        line_indent = _indent_of(raw)
+        if line_indent < indent:
+            return mapping, nxt
+        if line_indent > indent:
+            raise BuildError(
+                f"malformed snapshot: unexpected indentation: {raw.strip()[:60]!r}"
+            )
         stripped = raw.strip()
-        m = _MAPPING_RE.match(stripped)
-        if not m or (":" not in stripped):
+        if _is_dash_item(stripped):
+            raise BuildError(
+                f"malformed snapshot: unexpected list item inside mapping: {stripped[:60]!r}"
+            )
+        kv = _split_key_value(stripped)
+        if kv is None:
             raise BuildError(f"malformed snapshot: cannot parse line: {stripped[:80]!r}")
-        # Split on the first colon that is followed by whitespace or EOL, so
-        # values containing ':' (URLs, timestamps, ...) survive intact.
-        colon = None
-        for pos, ch in enumerate(stripped):
-            if ch == ":" and (pos + 1 == len(stripped) or stripped[pos + 1] in " \t"):
-                colon = pos
-                break
-        if colon is None:
-            raise BuildError(f"malformed snapshot: cannot parse line: {stripped[:80]!r}")
-        key = stripped[:colon].strip()
-        rest = stripped[colon + 1:].strip()
+        key, rest = kv
         if not key:
             raise BuildError(f"malformed snapshot: empty key in line: {stripped[:80]!r}")
-        value: Any = None
+        if key in mapping:
+            raise BuildError(f"malformed snapshot: duplicate key {key!r}")
+        i = nxt + 1
         if rest.startswith("'"):
-            value, i = _consume_single_quoted(rest, lines, i)
-            value = _parse_scalar(value)
+            value, i = _parse_quoted_value(rest, lines, i)
+            _reject_nested_block(lines, i, indent, f"value of key {key!r}")
         elif rest != "":
             value = _parse_scalar(rest)
-        while stack and indent <= stack[-1][0]:
-            stack.pop()
-        parent = stack[-1][1]
-        if rest == "":
-            child: dict[str, Any] = {}
-            parent[key] = child
-            stack.append((indent, child))
+            _reject_nested_block(lines, i, indent, f"value of key {key!r}")
         else:
-            parent[key] = value
-    return root
+            value, i = _parse_nested_or_empty(lines, i, indent)
+        mapping[key] = value
+    # unreachable
+
+
+def _parse_sequence(
+    lines: list[str], i: int, indent: int, first_rest: str | None = None
+) -> tuple[list[Any], int]:
+    items: list[Any] = []
+    if first_rest is not None:
+        value, i = _parse_seq_item_value(first_rest, lines, i, indent)
+        items.append(value)
+    while True:
+        nxt = _significant(lines, i)
+        if nxt is None:
+            return items, len(lines)
+        raw = lines[nxt]
+        line_indent = _indent_of(raw)
+        if line_indent < indent:
+            return items, nxt
+        if line_indent > indent:
+            raise BuildError(
+                f"malformed snapshot: unexpected indentation in list: {raw.strip()[:60]!r}"
+            )
+        stripped = raw.strip()
+        if not _is_dash_item(stripped):
+            return items, nxt
+        value, i = _parse_seq_item_value(stripped[1:].strip(), lines, nxt + 1, indent)
+        items.append(value)
+    # unreachable
+
+
+def _parse_seq_item_value(
+    rest: str, lines: list[str], i: int, indent: int
+) -> tuple[Any, int]:
+    """Parse one sequence item's content (text after ``-``)."""
+    if rest == "":
+        nxt = _significant(lines, i)
+        if nxt is None or _indent_of(lines[nxt]) <= indent:
+            return None, i
+        child = lines[nxt].strip()
+        if _is_dash_item(child):
+            return _parse_sequence(lines, nxt, _indent_of(lines[nxt]))
+        if child.startswith("'"):
+            value, i = _parse_quoted_value(child, lines, nxt + 1)
+            _reject_nested_block(lines, i, _indent_of(lines[nxt]), "list item")
+            return value, i
+        if child.startswith('"'):
+            if not (len(child) >= 2 and child.endswith('"')):
+                raise BuildError(
+                    f"malformed snapshot: unterminated quoted scalar: {child[:60]!r}"
+                )
+            value = _parse_scalar(child)
+            _reject_nested_block(lines, nxt + 1, _indent_of(lines[nxt]), "list item")
+            return value, i
+        if _split_key_value(child) is not None:
+            return _parse_mapping(lines, nxt, _indent_of(lines[nxt]))
+        raise BuildError(
+            f"malformed snapshot: cannot parse list item block: {child[:60]!r}"
+        )
+    if rest.startswith("'"):
+        value, i = _parse_quoted_value(rest, lines, i)
+        _reject_nested_block(lines, i, indent, "list item")
+        return value, i
+    if rest.startswith('"'):
+        value = _parse_scalar(rest)
+        _reject_nested_block(lines, i, indent, "list item")
+        return value, i
+    if _is_dash_item(rest):
+        # Nested sequence: '- - a' opens a sub-list whose items sit two
+        # columns past the outer dash (the conventional layout).
+        return _parse_sequence(lines, i, indent + 2, first_rest=rest[1:].strip())
+    kv = _split_key_value(rest)
+    if kv is not None and kv[0]:
+        return _parse_seq_map_item(kv[0], kv[1], lines, i, indent)
+    _reject_nested_block(lines, i, indent, "list item")
+    return _parse_scalar(rest), i
+
+
+def _parse_seq_map_item(
+    key: str, rest: str, lines: list[str], i: int, dash_indent: int
+) -> tuple[dict[str, Any], int]:
+    """Parse a ``- key: value`` sequence item plus its deeper-indented
+    continuation entries. Returns (sub_mapping, next_i)."""
+    if not key:
+        raise BuildError(f"malformed snapshot: empty key in list item: {key!r}")
+    sub: dict[str, Any] = {}
+    if rest.startswith("'"):
+        first_value, i = _parse_quoted_value(rest, lines, i)
+        # A quoted scalar item cannot own a mapping continuation.
+        _reject_nested_block(lines, i, dash_indent, "list item value")
+    elif rest != "":
+        first_value = _parse_scalar(rest)
+    else:
+        first_value, i = _parse_nested_or_empty(lines, i, dash_indent)
+    sub[key] = first_value
+    nxt = _significant(lines, i)
+    if nxt is not None and _indent_of(lines[nxt]) > dash_indent:
+        stripped = lines[nxt].strip()
+        if _is_dash_item(stripped):
+            raise BuildError(
+                "malformed snapshot: unexpected list item in mapping item: "
+                f"{stripped[:60]!r}"
+            )
+        if _split_key_value(stripped) is None:
+            raise BuildError(
+                "malformed snapshot: unexpected indented content in mapping item: "
+                f"{stripped[:60]!r}"
+            )
+        cont, i = _parse_mapping(lines, nxt, _indent_of(lines[nxt]))
+        for cont_key in cont:
+            if cont_key in sub:
+                raise BuildError(f"malformed snapshot: duplicate key {cont_key!r}")
+        sub.update(cont)
+    return sub, i
+
+
+def parse_simple_yaml(text: str) -> dict[str, Any]:
+    """Parse the indentation-based YAML subset written by ``yaml.safe_dump``.
+
+    Supports nested mappings, sequences of scalars (including sequences
+    nested under a mapping key at the same indent level, sequences
+    nested in sequences, and mappings nested in sequences), null/bool/
+    int/float scalars, single-quoted scalars (inline, multi-line with
+    YAML line folding, or starting on the line after their key) and
+    plain scalars. Malformed indentation and mapping/list mixtures raise
+    :class:`BuildError` instead of misparsing.
+    """
+    lines = text.splitlines()
+    first = _significant(lines, 0)
+    if first is None:
+        return {}
+    raw = lines[first]
+    indent = _indent_of(raw)
+    if _is_dash_item(raw.strip()):
+        raise BuildError("malformed snapshot: top-level mapping expected")
+    if _split_key_value(raw.strip()) is None:
+        raise BuildError(f"malformed snapshot: cannot parse line: {raw.strip()[:80]!r}")
+    value, next_i = _parse_mapping(lines, first, indent)
+    trailing = _significant(lines, next_i)
+    if trailing is not None:
+        raise BuildError(
+            "malformed snapshot: unexpected trailing content: "
+            f"{lines[trailing].strip()[:60]!r}"
+        )
+    return value
 
 
 def load_snapshot(path: str | Path) -> dict[str, Any]:
@@ -233,14 +479,18 @@ def find_reasoning_effort(engine_opts: Any) -> str | None:
     found: list[Any] = []
 
     def _search(node: Any) -> None:
-        if found or not isinstance(node, dict):
+        if found:
             return
-        reasoning = node.get("reasoning")
-        if isinstance(reasoning, dict) and "effort" in reasoning:
-            found.append(reasoning["effort"])
-            return
-        for key in sorted(node, key=str):
-            _search(node[key])
+        if isinstance(node, dict):
+            reasoning = node.get("reasoning")
+            if isinstance(reasoning, dict) and "effort" in reasoning:
+                found.append(reasoning["effort"])
+                return
+            for key in sorted(node, key=str):
+                _search(node[key])
+        elif isinstance(node, list):
+            for entry in node:
+                _search(entry)
 
     _search(engine_opts if isinstance(engine_opts, dict) else {})
     if not found or found[0] is None:

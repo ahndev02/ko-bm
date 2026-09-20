@@ -1,10 +1,12 @@
 backend:
   family: api # api | transformers | vllm
-  model: google/gemini-3.8-flash:floor
+  model: google/gemma-4-31b-it
   api_provider: openai # openai | anthropic (only when family == api)
   endpoint: https://openrouter.ai/api/v1 # optional, for OpenAI-compatible endpoints
   engine_opts:
     extra_body:
+      provider:
+        only: [deepinfra/turbo]
       # chat_template_kwargs:
       #   enable_thinking: false
   max_retries: 3

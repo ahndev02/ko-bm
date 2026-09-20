@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-19T05:42:34Z",
+  "generated_at": "2026-09-20T11:09:20Z",
   "generator": "site/build.py",
   "item_count": 700,
   "dataset": {
@@ -420,6 +420,105 @@
       "evidence": {
         "snapshot": "site/data/runs/run-20260918-162449-gpt-5.6-luna-floor/config.snapshot.yaml",
         "results": "site/data/runs/run-20260918-162449-gpt-5.6-luna-floor/results.json"
+      }
+    },
+    {
+      "slug": "run-20260920-072521-gemma-4-31b-it",
+      "path": "runs/run-20260920-072521-gemma-4-31b-it",
+      "model": "google/gemma-4-31b-it",
+      "label": "gemma-4-31b-it",
+      "timestamp": "2026-09-20T07:25:21Z",
+      "backend": "api",
+      "provider": "openai",
+      "endpoint": "https://openrouter.ai/api/v1",
+      "reasoning_mode": "provider-default",
+      "reasoning_effort": null,
+      "category": "primary",
+      "engine_extra_body": {
+        "provider": {
+          "only": [
+            "deepinfra/turbo"
+          ]
+        }
+      },
+      "max_new_tokens": 2048,
+      "prompt_template_hash": "3941207196edd4239a011e10649c790ed79a747490238330c32b2a2ed35383e1",
+      "dataset": {
+        "name": "snunlp/KoBALT-700",
+        "revision": "0.0.0"
+      },
+      "total": 700,
+      "correct": 500,
+      "accuracy": 0.7142857142857143,
+      "wilson_95": {
+        "lo": 0.679721,
+        "hi": 0.746512
+      },
+      "by_domain": [
+        {
+          "name": "Morphology",
+          "n": 42,
+          "correct": 23,
+          "accuracy": 0.5476190476190477
+        },
+        {
+          "name": "Phonetics/Phonology",
+          "n": 62,
+          "correct": 36,
+          "accuracy": 0.5806451612903226
+        },
+        {
+          "name": "Pragmatics",
+          "n": 81,
+          "correct": 52,
+          "accuracy": 0.6419753086419753
+        },
+        {
+          "name": "Semantics",
+          "n": 215,
+          "correct": 157,
+          "accuracy": 0.7302325581395349
+        },
+        {
+          "name": "Syntax",
+          "n": 300,
+          "correct": 232,
+          "accuracy": 0.7733333333333333
+        }
+      ],
+      "by_level": [
+        {
+          "name": "1",
+          "n": 182,
+          "correct": 175,
+          "accuracy": 0.9615384615384616
+        },
+        {
+          "name": "2",
+          "n": 220,
+          "correct": 189,
+          "accuracy": 0.8590909090909091
+        },
+        {
+          "name": "3",
+          "n": 298,
+          "correct": 136,
+          "accuracy": 0.4563758389261745
+        }
+      ],
+      "invalid": {
+        "count": 21,
+        "rate": 0.03
+      },
+      "empty_raw_output": 0,
+      "latency_ms": {
+        "n": 700,
+        "median": 15443.5,
+        "p95": 37590.0
+      },
+      "evidence": {
+        "snapshot": "site/data/runs/run-20260920-072521-gemma-4-31b-it/config.snapshot.yaml",
+        "results": "site/data/runs/run-20260920-072521-gemma-4-31b-it/results.json"
       }
     },
     {

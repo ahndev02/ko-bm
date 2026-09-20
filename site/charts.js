@@ -1,13 +1,15 @@
-/* KoBALT-700 report rendering. Vanilla JS, DOM APIs only, no innerHTML with data. */
+/* KoBALT-700 record rendering. Vanilla JS, DOM APIs only, no innerHTML with data.
+   One payload (results.json) feeds all pages; every renderer guards on element
+   presence, so each page calls only what it contains. */
 (function () {
   "use strict";
 
   var SVG_NS = "http://www.w3.org/2000/svg";
-  var ACCENT = "#1e5b4c";
-  var TRACK = "#e7e1d3";
-  var GRID = "#d8d1c0";
-  var INK = "#201d18";
-  var MUTED = "#575046";
+  var ACCENT = "#0f5b8f";
+  var TRACK = "#ececec";
+  var GRID = "#c9c9c9";
+  var INK = "#1a1a1a";
+  var MUTED = "#545454";
 
   function $(id) { return document.getElementById(id); }
 
@@ -37,9 +39,7 @@
     return node;
   }
 
-  function isNum(x) {
-    return typeof x === "number" && isFinite(x);
-  }
+  function isNum(x) { return typeof x === "number" && isFinite(x); }
 
   function pct(x, digits) {
     if (!isNum(x)) return "not reported";
@@ -70,6 +70,24 @@
     return p;
   }
 
+  /* Presentation tiers, decided here at render time. The build only marks
+     reasoning effort "none" as ablation; explicit minimal/low effort runs
+     arrive as primary and are separated here instead of ranked with
+     provider-default runs. */
+  function tierOf(r) {
+    if (!r) return "disabled";
+    if (r.reasoning_mode === "none" || r.category === "ablation") return "disabled";
+    if (typeof r.reasoning_mode === "string" && r.reasoning_mode &&
+        r.reasoning_mode !== "provider-default") return "constrained";
+    return "default";
+  }
+
+  function tierShort(t) {
+    if (t === "constrained") return "reasoning-limited";
+    if (t === "disabled") return "reasoning-disabled";
+    return "provider-default";
+  }
+
   function reasoningLabel(run) {
     if (run.reasoning_mode === "provider-default") return "Provider default";
     if (typeof run.reasoning_mode === "string" && run.reasoning_mode) {
@@ -87,46 +105,59 @@
     return "Unnamed run";
   }
 
-  function chartLabel(run) {
-    // Compact label for SVG rows: model basename plus non-default reasoning mode.
-    var base = "Unnamed run";
+  function modelBase(run) {
     if (typeof run.model === "string" && run.model) {
       var parts = run.model.split("/");
-      base = parts[parts.length - 1];
-    } else if (typeof run.label === "string" && run.label) {
-      base = run.label;
+      return parts[parts.length - 1];
     }
-    if (typeof run.reasoning_mode === "string" && run.reasoning_mode &&
-        run.reasoning_mode !== "provider-default") {
-      base += " (" + run.reasoning_mode + ")";
-    }
+    return shortName(run);
+  }
+
+  function chartLabel(run) {
+    var base = modelBase(run);
+    if (tierOf(run) !== "default") base += " (" + run.reasoning_mode + ")";
     return base;
   }
 
   function setStatus(text, isError) {
     var s = $("status");
+    if (!s) return;
     s.textContent = text;
     s.className = isError ? "status error" : "status";
   }
 
   function chartError(containerId, message) {
     var c = $(containerId);
+    if (!c) return;
     while (c.firstChild) c.removeChild(c.firstChild);
-    var p = el("p", { "class": "chart-error" }, message);
-    c.appendChild(p);
+    c.appendChild(el("p", { "class": "chart-error" }, message));
     c.removeAttribute("role");
+  }
+
+  function evidenceLinks(ev) {
+    var p = el("p", null);
+    var snap = evidenceHref(ev.snapshot);
+    var res = evidenceHref(ev.results);
+    if (snap) {
+      p.appendChild(el("a", { href: snap }, "Config"));
+      if (res) p.appendChild(document.createTextNode(" · "));
+    }
+    if (res) p.appendChild(el("a", { href: res }, "Results"));
+    if (!snap && !res) p.appendChild(el("span", { "class": "small" }, "Evidence unavailable."));
+    return p;
   }
 
   /* ---------------- overall dot-and-interval chart ---------------- */
 
   function renderOverallChart(runs) {
     var box = $("overall-chart");
+    if (!box) return;
     while (box.firstChild) box.removeChild(box.firstChild);
     if (!runs.length) {
-      chartError("overall-chart", "No primary runs to chart.");
+      chartError("overall-chart", "No runs to chart.");
       return;
     }
-    var W = 680, labelW = 205, valueW = 150, padR = 8, padT = 30, rowH = 46;
+    var W = 680, labelW = 205, valueW = 150, padR = 8, padT = 8, rowH = 40;
     var plotX = labelW, plotW = W - labelW - valueW - padR;
     var H = padT + runs.length * rowH + 26;
 
@@ -136,22 +167,19 @@
       "aria-hidden": "true",
       "font-family": "inherit"
     });
-    var desc = svgEl("desc", null,
+    svg.appendChild(svgEl("desc", null,
       "Dot-and-interval chart. " + runs.map(function (r) {
         var w = r.wilson_95 || {};
         return shortName(r) + ": " + pct(r.accuracy) +
           (isNum(w.lo) && isNum(w.hi)
             ? " (95% interval " + pct(w.lo) + " to " + pct(w.hi) + ")"
             : " (interval unavailable)");
-      }).join(". "));
-    svg.appendChild(desc);
+      }).join(". ")));
 
-    // gridlines + axis labels at 0/25/50/75/100
     [0, 0.25, 0.5, 0.75, 1].forEach(function (t) {
       var x = plotX + t * plotW;
       svg.appendChild(svgEl("line", {
-        x1: x, y1: padT - 8, x2: x, y2: H - 24,
-        stroke: GRID, "stroke-width": 1
+        x1: x, y1: padT, x2: x, y2: H - 24, stroke: GRID, "stroke-width": 1
       }));
       svg.appendChild(svgEl("text", {
         x: x, y: H - 8, "text-anchor": "middle",
@@ -161,11 +189,10 @@
 
     runs.forEach(function (r, i) {
       var cy = padT + i * rowH + rowH / 2;
-      // run label (truncated for space; full name is in the cards)
       var name = chartLabel(r);
-      var shown = name.length > 30 ? name.slice(0, 29) + "…" : name;
+      var shown = name.length > 28 ? name.slice(0, 27) + "…" : name;
       svg.appendChild(svgEl("text", {
-        x: 12, y: cy + 4, "font-size": 12.5, fill: INK
+        x: 4, y: cy + 4, "font-size": 12.5, fill: INK
       }, shown));
 
       var acc = isNum(r.accuracy) ? r.accuracy : null;
@@ -185,16 +212,14 @@
         });
       }
       if (acc !== null) {
-        var cx = plotX + Math.max(0, Math.min(1, acc)) * plotW;
         svg.appendChild(svgEl("circle", {
-          cx: cx, cy: cy, r: 6, fill: ACCENT,
-          stroke: "#ffffff", "stroke-width": 1.5
+          cx: plotX + Math.max(0, Math.min(1, acc)) * plotW,
+          cy: cy, r: 5.5, fill: ACCENT
         }));
       }
       var val = acc !== null ? pct(acc) : "not reported";
       var ci = (acc !== null && isNum(w.lo) && isNum(w.hi))
-        ? " (" + pct(w.lo, 1) + "–" + pct(w.hi, 1) + ")"
-        : (acc !== null ? " (interval unavailable)" : "");
+        ? " (" + pct(w.lo, 1) + "–" + pct(w.hi, 1) + ")" : "";
       svg.appendChild(svgEl("text", {
         x: W - padR, y: cy + 4, "text-anchor": "end",
         "font-size": 12, fill: INK
@@ -204,82 +229,167 @@
     box.appendChild(svg);
   }
 
-  /* ---------------- run cards ---------------- */
+  /* ---------------- overview findings ---------------- */
 
-  function renderCards(runs) {
-    var wrap = $("run-cards");
-    while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
-    var list = el("ul", { "class": "cards" });
-    runs.forEach(function (r, i) {
-      var item = el("li", null);
-      var card = el("article", {
-        "class": "card" + (i === 0 ? " lead" : ""),
-        "aria-label": shortName(r)
-      });
-      card.appendChild(el("h3", null, shortName(r)));
-      if (typeof r.model === "string" && r.model && r.model !== shortName(r)) {
-        card.appendChild(el("p", { "class": "model-id" }, "Model id: " + r.model));
-      }
-      var dl = el("dl", null);
-      function row(term, value, cls) {
-        dl.appendChild(el("dt", null, term));
-        var dd = el("dd", cls ? { "class": cls } : null, value);
-        dl.appendChild(dd);
-      }
-      var w = r.wilson_95 || {};
-      var score = pct(r.accuracy) +
-        ((isNum(w.lo) && isNum(w.hi))
-          ? "  (95% CI " + pct(w.lo) + "–" + pct(w.hi) + ")"
-          : "  (interval unavailable)");
-      row("Accuracy", score, "score");
-      row("Correct", isNum(r.correct) && isNum(r.total)
-        ? r.correct + " / " + r.total : "not reported");
-      var inv = r.invalid || {};
-      row("Invalid outputs", isNum(inv.count) && isNum(r.total)
-        ? inv.count + " (" + pct(inv.rate !== undefined ? inv.rate : inv.count / r.total) + ")"
-        : "not reported");
-      var lat = r.latency_ms || {};
-      row("Median latency", fmtMs(lat.median));
-      row("Reasoning", reasoningLabel(r));
-      if (typeof r.timestamp === "string" && r.timestamp) {
-        var d = fmtDate(r.timestamp);
-        row("Run date", d ? d + " (UTC)" : r.timestamp);
-      }
-      card.appendChild(dl);
-
-      var ev = r.evidence || {};
-      var evP = el("p", { "class": "evidence" });
-      var snap = evidenceHref(ev.snapshot);
-      var res = evidenceHref(ev.results);
-      if (snap) {
-        var a1 = el("a", { href: snap }, "Config snapshot");
-        evP.appendChild(a1);
-      }
-      if (res) {
-        var a2 = el("a", { href: res }, "Results JSON");
-        evP.appendChild(a2);
-      }
-      if (!snap && !res) {
-        evP.appendChild(el("span", { "class": "small" }, "Evidence files unavailable."));
-      }
-      card.appendChild(evP);
-      item.appendChild(card);
-      list.appendChild(item);
-    });
-    wrap.appendChild(list);
+  function levelAcc(run, level) {
+    var rows = Array.isArray(run.by_level) ? run.by_level : [];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i] && String(rows[i].name) === String(level)) return rows[i].accuracy;
+    }
+    return null;
   }
 
-  /* ---------------- grouped breakdown charts (run-major blocks) ---------------- */
+  function renderFindings(tiers) {
+    var box = $("findings");
+    if (!box) return;
+    while (box.firstChild) box.removeChild(box.firstChild);
+    var def = tiers.defaultRun || [];
+    if (!def.length) {
+      box.appendChild(el("li", null, "No provider-default runs in the current data."));
+      return;
+    }
+    var top = def[0];
+    var w = top.wilson_95 || {};
+    var li1 = el("li", null);
+    li1.appendChild(document.createTextNode("The highest observed score is "));
+    li1.appendChild(el("strong", null, modelBase(top)));
+    li1.appendChild(document.createTextNode(" at " + pct(top.accuracy) +
+      (isNum(w.lo) && isNum(w.hi) ? " (95% CI " + pct(w.lo) + "–" + pct(w.hi) + ")" : "") +
+      ", " + top.correct + " of " + top.total + ". This is the highest in this set, not a state-of-the-art claim."));
+    box.appendChild(li1);
+
+    var l3 = def.map(function (r) { return { r: r, a: levelAcc(r, "1"), b: levelAcc(r, "3") }; })
+      .filter(function (x) { return isNum(x.a) && isNum(x.b); });
+    if (l3.length) {
+      var hi = l3.reduce(function (m, x) { return x.b > m.b ? x : m; });
+      var lo = l3.reduce(function (m, x) { return x.b < m.b ? x : m; });
+      var allDrop = l3.every(function (x) { return x.b < x.a; });
+      var li2 = el("li", null,
+        "Difficulty separates the runs: on Level 3 (n=298), scores run from " +
+        pct(lo.b) + " (" + modelBase(lo.r) + ") to " + pct(hi.b) + " (" +
+        modelBase(hi.r) + ")" + (allDrop ? "; every run scores lowest on Level 3." : "."));
+      box.appendChild(li2);
+    }
+
+    var pair = findPair(tiers.disabled, def);
+    if (pair) {
+      var delta = (pair.ab.accuracy - pair.base.accuracy) * 100;
+      var li3 = el("li", null,
+        "Reasoning matters more than the ranking suggests: switching " +
+        modelBase(pair.base) + " from provider-default reasoning to disabled " +
+        "changed accuracy from " + pct(pair.base.accuracy) + " to " +
+        pct(pair.ab.accuracy) + " (" + (delta > 0 ? "+" : "") + delta.toFixed(1) +
+        " points) on the same 700 items. See the paired comparison on the Results page.");
+      var a = el("a", { href: "results.html#ablations" }, "Results: reasoning comparisons");
+      li3.appendChild(document.createTextNode(" "));
+      li3.appendChild(a);
+      box.appendChild(li3);
+    }
+  }
+
+  function findPair(disabled, primary) {
+    for (var i = 0; i < disabled.length; i++) {
+      var ab = disabled[i];
+      if (typeof ab.model !== "string") continue;
+      for (var j = 0; j < primary.length; j++) {
+        if (primary[j].model === ab.model &&
+            isNum(primary[j].accuracy) && isNum(ab.accuracy)) {
+          return { base: primary[j], ab: ab };
+        }
+      }
+    }
+    return null;
+  }
+
+  /* ---------------- tiered comparison tables ---------------- */
+
+  function tierTable(runs, captionText, hideReasoning) {
+    var table = el("table", { "class": "compare" });
+    table.appendChild(el("caption", null, captionText));
+    var thead = el("thead", null);
+    var hr = el("tr", null);
+    hr.appendChild(el("th", { scope: "col" }, "Model / config"));
+    ["Accuracy (95% CI)", "Correct", "Invalid", "Median latency"].forEach(function (h) {
+      hr.appendChild(el("th", { scope: "col", "class": "num" }, h));
+    });
+    // The default tier shares one reasoning setting, shown in the caption
+    // instead of a constant column, so the table fits the measure.
+    if (!hideReasoning) hr.appendChild(el("th", { scope: "col" }, "Reasoning"));
+    hr.appendChild(el("th", { scope: "col" }, "Evidence"));
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var tbody = el("tbody", null);
+    runs.forEach(function (r) {
+      var tr = el("tr", null);
+      var th = el("th", { scope: "row" }, modelBase(r));
+      // Group membership is stated by the section heading, so no per-row tag:
+      // it only widened the first column.
+      tr.appendChild(th);
+      var w = r.wilson_95 || {};
+      tr.appendChild(el("td", { "class": "num soft" },
+        pct(r.accuracy) + (isNum(w.lo) && isNum(w.hi)
+          ? " (" + pct(w.lo, 1) + "–" + pct(w.hi, 1) + ")" : "")));
+      tr.appendChild(el("td", { "class": "num" },
+        isNum(r.correct) && isNum(r.total) ? r.correct + " / " + r.total : "n/a"));
+      var inv = r.invalid || {};
+      tr.appendChild(el("td", { "class": "num" },
+        isNum(inv.count) && isNum(r.total)
+          ? inv.count + " (" + pct(isNum(inv.rate) ? inv.rate : inv.count / r.total) + ")" : "n/a"));
+      tr.appendChild(el("td", { "class": "num" }, fmtMs((r.latency_ms || {}).median)));
+      // In the limited/disabled tables the group heading already states the
+      // setting, so the cell carries only the mode word (minimal/low/none).
+      if (!hideReasoning) {
+        tr.appendChild(el("td", null,
+          (typeof r.reasoning_mode === "string" && r.reasoning_mode) ? r.reasoning_mode : "n/a"));
+      }
+      var tdEv = el("td", null);
+      var ev = r.evidence || {};
+      var snap = evidenceHref(ev.snapshot);
+      var res = evidenceHref(ev.results);
+      if (snap) tdEv.appendChild(el("a", { href: snap }, "Config"));
+      if (snap && res) tdEv.appendChild(document.createTextNode(" · "));
+      if (res) tdEv.appendChild(el("a", { href: res }, "Results"));
+      if (!snap && !res) tdEv.appendChild(el("span", { "class": "small" }, "n/a"));
+      tr.appendChild(tdEv);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function scrollWrap(node, label) {
+    var d = el("div", {
+      "class": "table-scroll", tabindex: "0", role: "region", "aria-label": label
+    });
+    d.appendChild(node);
+    return d;
+  }
+
+  function renderTierTables(tiers) {
+    var map = [
+      ["tier-default-wrap", tiers.defaultRun, "Provider-default reasoning for every row: same harness, same prompt, provider default reasoning.", true],
+      ["tier-constrained-wrap", tiers.constrained, "Reasoning-limited runs (explicit minimal/low effort). Same harness and prompt, but the provider was told to reason less. Not directly comparable to the rows above.", false],
+      ["tier-disabled-wrap", tiers.disabled, "Reasoning disabled. Configuration experiments; compare only within the paired panels below, not against the tables above.", false]
+    ];
+    map.forEach(function (m) {
+      var wrap = $(m[0]);
+      if (!wrap) return;
+      while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
+      if (!m[1].length) {
+        wrap.appendChild(el("p", { "class": "small" }, "No runs in this group in the current data."));
+        return;
+      }
+      wrap.appendChild(scrollWrap(tierTable(m[1], m[2], m[3]), m[2].split(".")[0]));
+    });
+  }
+
+  /* ---------------- breakdown charts and tables ---------------- */
 
   function breakdownGroups(runs, key) {
-    // union of group names across runs, in first-seen order
     var names = [];
     runs.forEach(function (r) {
-      var rows = Array.isArray(r[key]) ? r[key] : [];
-      rows.forEach(function (g) {
-        if (g && typeof g.name === "string" && names.indexOf(g.name) === -1) {
-          names.push(g.name);
-        }
+      (Array.isArray(r[key]) ? r[key] : []).forEach(function (g) {
+        if (g && typeof g.name === "string" && names.indexOf(g.name) === -1) names.push(g.name);
       });
     });
     return names;
@@ -287,32 +397,31 @@
 
   function renderBreakdownChart(containerId, runs, key, groupLabel) {
     var box = $(containerId);
+    if (!box) return false;
     while (box.firstChild) box.removeChild(box.firstChild);
     var names = breakdownGroups(runs, key);
     if (!runs.length || !names.length) {
       chartError(containerId, "Breakdown data unavailable.");
       return false;
     }
-    var W = 680, labelW = 205, valueW = 64, padR = 10;
+    var W = 680, labelW = 205, valueW = 56, padR = 10;
     var plotX = labelW, plotW = W - labelW - valueW - padR;
-    var rowH = 26, blockTitleH = 30, blockGap = 14, padT = 8, padB = 10;
+    var rowH = 24, blockTitleH = 28, blockGap = 12, padT = 8, padB = 8;
     var H = padT + runs.length * (blockTitleH + names.length * rowH + blockGap) + padB;
 
     var svg = svgEl("svg", {
       viewBox: "0 0 " + W + " " + H,
-      role: "presentation",
-      "aria-hidden": "true",
-      "font-family": "inherit"
+      role: "presentation", "aria-hidden": "true", "font-family": "inherit"
     });
     svg.appendChild(svgEl("desc", null,
-      "Bar chart of " + groupLabel + " accuracy by run, on a zero to one-hundred percent scale."));
+      "Bar chart of " + groupLabel + " accuracy by run, zero to one hundred percent."));
 
     var y = padT;
     runs.forEach(function (r) {
       var title = chartLabel(r);
-      if (title.length > 52) title = title.slice(0, 51) + "…";
+      if (title.length > 50) title = title.slice(0, 49) + "…";
       svg.appendChild(svgEl("text", {
-        x: 12, y: y + 16, "font-size": 13, "font-weight": "bold", fill: INK
+        x: 4, y: y + 15, "font-size": 13, "font-weight": "bold", fill: INK
       }, title));
       y += blockTitleH;
       var byName = {};
@@ -322,26 +431,24 @@
       names.forEach(function (n) {
         var g = byName[n] || {};
         var label = n + (isNum(g.n) ? " (n=" + g.n + ")" : "");
-        if (label.length > 30) label = label.slice(0, 29) + "…";
+        if (label.length > 28) label = label.slice(0, 27) + "…";
         svg.appendChild(svgEl("text", {
-          x: 12, y: y + 16, "font-size": 12, fill: MUTED
+          x: 4, y: y + 15, "font-size": 12, fill: MUTED
         }, label));
         var acc = isNum(g.accuracy) ? Math.max(0, Math.min(1, g.accuracy)) : null;
         svg.appendChild(svgEl("rect", {
-          x: plotX, y: y + 4, width: plotW, height: 14,
-          fill: TRACK, rx: 2
+          x: plotX, y: y + 4, width: plotW, height: 13, fill: TRACK
         }));
         if (acc !== null) {
           svg.appendChild(svgEl("rect", {
-            x: plotX, y: y + 4, width: Math.max(acc * plotW, 2), height: 14,
-            fill: ACCENT, rx: 2
+            x: plotX, y: y + 4, width: Math.max(acc * plotW, 2), height: 13, fill: ACCENT
           }));
           svg.appendChild(svgEl("text", {
-            x: plotX + plotW + 6, y: y + 16, "font-size": 12, fill: INK
+            x: plotX + plotW + 5, y: y + 15, "font-size": 12, fill: INK
           }, pct(g.accuracy)));
         } else {
           svg.appendChild(svgEl("text", {
-            x: plotX + plotW + 6, y: y + 16, "font-size": 12, fill: MUTED
+            x: plotX + plotW + 5, y: y + 15, "font-size": 12, fill: MUTED
           }, "n/a"));
         }
         y += rowH;
@@ -353,8 +460,9 @@
     return true;
   }
 
-  function renderBreakdownTable(wrapId, runs, key, firstColLabel) {
+  function renderBreakdownTable(wrapId, runs, key, firstColLabel, tagTiers) {
     var wrap = $(wrapId);
+    if (!wrap) return;
     while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
     var names = breakdownGroups(runs, key);
     if (!runs.length || !names.length) {
@@ -362,102 +470,96 @@
       return;
     }
     var table = el("table", null);
-    var cap = el("caption", null,
-      "Exact " + firstColLabel.toLowerCase() + " accuracy: correct / total (percent).");
-    table.appendChild(cap);
+    table.appendChild(el("caption", null,
+      "Exact " + firstColLabel.toLowerCase() + " accuracy: correct / total (percent)."));
     var thead = el("thead", null);
     var hr = el("tr", null);
     hr.appendChild(el("th", { scope: "col" }, firstColLabel));
     runs.forEach(function (r) {
-      hr.appendChild(el("th", { scope: "col" }, shortName(r)));
+      var h = modelBase(r) + (tagTiers && tierOf(r) !== "default" ? " [" + tierShort(tierOf(r)) + "]" : "");
+      hr.appendChild(el("th", { scope: "col" }, h));
     });
     thead.appendChild(hr);
     table.appendChild(thead);
     var tbody = el("tbody", null);
     names.forEach(function (n) {
       var tr = el("tr", null);
-      // row header includes n when consistent reporters exist
       var n0 = null;
       runs.forEach(function (r) {
-        var g = (Array.isArray(r[key]) ? r[key] : []).filter(function (x) {
+        var gs = (Array.isArray(r[key]) ? r[key] : []).filter(function (x) {
           return x && x.name === n;
-        })[0];
-        if (g && isNum(g.n) && n0 === null) n0 = g.n;
+        });
+        if (gs.length && isNum(gs[0].n) && n0 === null) n0 = gs[0].n;
       });
       tr.appendChild(el("th", { scope: "row" }, n + (n0 !== null ? " (n=" + n0 + ")" : "")));
       runs.forEach(function (r) {
-        var g = (Array.isArray(r[key]) ? r[key] : []).filter(function (x) {
+        var gs = (Array.isArray(r[key]) ? r[key] : []).filter(function (x) {
           return x && x.name === n;
-        })[0];
-        var cell = (!g || !isNum(g.correct) || !isNum(g.n))
-          ? "n/a"
-          : g.correct + " / " + g.n + " (" + pct(g.accuracy) + ")";
-        tr.appendChild(el("td", { "class": "num" }, cell));
+        });
+        var g = gs.length ? gs[0] : null;
+        tr.appendChild(el("td", { "class": "num" },
+          (!g || !isNum(g.correct) || !isNum(g.n))
+            ? "n/a" : g.correct + " / " + g.n + " (" + pct(g.accuracy) + ")"));
       });
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
-    wrap.appendChild(table);
+    wrap.appendChild(scrollWrap(table, firstColLabel + " values by run"));
   }
 
-  /* ---------------- ablations ---------------- */
+  /* ---------------- reasoning comparisons ---------------- */
 
-  function renderAblations(primary, ablations) {
+  function renderAblations(disabled, primary) {
     var body = $("ablation-body");
+    if (!body) return;
     while (body.firstChild) body.removeChild(body.firstChild);
-    if (!ablations.length) {
-      body.appendChild(el("p", null, "No reasoning ablations are present in the current data."));
+    if (!disabled.length) {
+      body.appendChild(el("p", null, "No reasoning-disabled runs in the current data."));
       return;
     }
-    ablations.forEach(function (ab) {
-      var base = null;
+    // Paired first, unpaired observations after.
+    var paired = [], unpaired = [];
+    disabled.forEach(function (ab) {
+      var found = null;
       if (typeof ab.model === "string") {
         for (var i = 0; i < primary.length; i++) {
-          if (primary[i].model === ab.model) { base = primary[i]; break; }
+          if (primary[i].model === ab.model) { found = primary[i]; break; }
         }
       }
-      var panel = el("div", { "class": "ablation-pair" });
+      (found ? paired : unpaired).push({ ab: ab, base: found });
+    });
+    paired.concat(unpaired).forEach(function (item) {
+      var ab = item.ab, base = item.base;
+      var panel = el("div", { "class": "ablation" });
       panel.appendChild(el("h3", null, shortName(ab)));
       if (base && isNum(base.accuracy) && isNum(ab.accuracy)) {
         var delta = (ab.accuracy - base.accuracy) * 100;
-        var sign = delta > 0 ? "+" : "";
-        var p = el("p", { "class": "delta" },
+        panel.appendChild(el("p", { "class": "delta" },
           pct(base.accuracy) + " → " + pct(ab.accuracy) +
-          "  (" + sign + delta.toFixed(1) + " points)");
-        panel.appendChild(p);
+          "  (" + (delta > 0 ? "+" : "") + delta.toFixed(1) + " points)"));
         panel.appendChild(el("p", null,
-          "Compared with the provider-default run of the same model (" +
-          shortName(base) + ", " + pct(base.accuracy) + "), disabling reasoning " +
-          (delta <= 0 ? "lowered" : "raised") + " accuracy by " +
-          Math.abs(delta).toFixed(1) + " points on the same 700 items. " +
-          "This is a configuration experiment, not a model rank."));
-        var latB = (base.latency_ms || {}).median;
-        var latA = (ab.latency_ms || {}).median;
-        var invB = (base.invalid || {}).count;
-        var invA = (ab.invalid || {}).count;
+          "Same model, same 700 items; only the provider reasoning setting changed " +
+          "(provider default → disabled). " +
+          (delta <= 0 ? "Disabling reasoning lowered" : "Disabling reasoning raised") +
+          " accuracy by " + Math.abs(delta).toFixed(1) +
+          " points. A configuration result, not a model rank."));
         var bits = [];
-        if (isNum(latB) && isNum(latA)) {
-          bits.push("median latency " + fmtMs(latB) + " → " + fmtMs(latA));
-        }
+        var latB = (base.latency_ms || {}).median, latA = (ab.latency_ms || {}).median;
+        if (isNum(latB) && isNum(latA)) bits.push("median latency " + fmtMs(latB) + " → " + fmtMs(latA));
+        var invB = (base.invalid || {}).count, invA = (ab.invalid || {}).count;
         if (isNum(invB) && isNum(invA) && isNum(base.total)) {
           bits.push("invalid outputs " + invB + " → " + invA + " of " + base.total);
         }
-        if (bits.length) {
-          panel.appendChild(el("p", { "class": "ablation-note" },
-            "Side effects of the setting change: " + bits.join("; ") + "."));
-        }
+        if (bits.length) panel.appendChild(el("p", { "class": "ablation-note" }, bits.join("; ") + "."));
       } else {
         panel.appendChild(el("p", null,
-          "Accuracy: " + pct(ab.accuracy) + ". No matching provider-default run " +
-          "for this model is present, so no paired comparison is shown."));
+          "Accuracy " + pct(ab.accuracy) + " with reasoning disabled (" +
+          (isNum(ab.correct) ? ab.correct + " of " + ab.total : "counts unavailable") + "). " +
+          "There is no provider-default run of this model in the current data, so this " +
+          "stands as an unpaired observation: it cannot show what disabling reasoning " +
+          "changed, only where this configuration landed."));
       }
-      var ev = ab.evidence || {};
-      var evP = el("p", { "class": "evidence small" });
-      var snap = evidenceHref(ev.snapshot);
-      var res = evidenceHref(ev.results);
-      if (snap) evP.appendChild(el("a", { href: snap }, "Config snapshot"));
-      if (res) evP.appendChild(el("a", { href: res }, "Results JSON"));
-      if (snap || res) panel.appendChild(evP);
+      panel.appendChild(evidenceLinks(ab.evidence || {}));
       body.appendChild(panel);
     });
   }
@@ -466,6 +568,7 @@
 
   function renderReliability(allRuns) {
     var wrap = $("reliability-table-wrap");
+    if (!wrap) return;
     while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
     if (!allRuns.length) {
       wrap.appendChild(el("p", { "class": "small" }, "Reliability data unavailable."));
@@ -476,47 +579,126 @@
       "Invalid outputs and latency per run. Latency reflects the endpoint used, not the model itself."));
     var thead = el("thead", null);
     var hr = el("tr", null);
-    ["Run", "Invalid", "Empty outputs", "Median latency", "p95 latency"].forEach(function (h, i) {
-      hr.appendChild(el("th", i === 0 ? { scope: "col" } : { scope: "col", "class": "num" }, h));
+    hr.appendChild(el("th", { scope: "col" }, "Run"));
+    ["Invalid", "Empty outputs", "Median latency", "p95 latency"].forEach(function (h) {
+      hr.appendChild(el("th", { scope: "col", "class": "num" }, h));
     });
     thead.appendChild(hr);
     table.appendChild(thead);
     var tbody = el("tbody", null);
     allRuns.forEach(function (r) {
       var tr = el("tr", null);
-      var label = shortName(r) + (r.category === "ablation" ? " (ablation)" : "");
-      tr.appendChild(el("th", { scope: "row" }, label));
+      var t = tierOf(r);
+      tr.appendChild(el("th", { scope: "row" },
+        modelBase(r) + (t !== "default" ? " [" + tierShort(t) + "]" : "")));
       var inv = r.invalid || {};
       tr.appendChild(el("td", { "class": "num" },
         isNum(inv.count) && isNum(r.total)
           ? inv.count + " / " + r.total + " (" + pct(isNum(inv.rate) ? inv.rate : inv.count / r.total) + ")"
-          : "not reported"));
-      var empty = r.empty_raw_output;
+          : "n/a"));
       tr.appendChild(el("td", { "class": "num" },
-        (typeof empty === "number" && isNum(r.total))
-          ? empty + " / " + r.total : "not reported"));
+        (typeof r.empty_raw_output === "number" && isNum(r.total))
+          ? r.empty_raw_output + " / " + r.total : "n/a"));
       var lat = r.latency_ms || {};
       tr.appendChild(el("td", { "class": "num" }, fmtMs(lat.median)));
       tr.appendChild(el("td", { "class": "num" }, fmtMs(lat.p95)));
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
-    wrap.appendChild(table);
+    wrap.appendChild(scrollWrap(table, "Invalid outputs and latency by run"));
+  }
+
+  /* ---------------- runs archive ---------------- */
+
+  function renderRunIndex(allRuns) {
+    var wrap = $("run-index-wrap");
+    if (!wrap) return;
+    while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
+    if (!allRuns.length) {
+      wrap.appendChild(el("p", { "class": "small" }, "No runs in the current data."));
+      return;
+    }
+    var table = el("table", null);
+    table.appendChild(el("caption", null, "All configurations. Detail follows below, one section per run."));
+    var thead = el("thead", null);
+    var hr = el("tr", null);
+    hr.appendChild(el("th", { scope: "col" }, "Run"));
+    hr.appendChild(el("th", { scope: "col", "class": "num" }, "Accuracy"));
+    hr.appendChild(el("th", { scope: "col" }, "Reasoning"));
+    hr.appendChild(el("th", { scope: "col" }, "Run date"));
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var tbody = el("tbody", null);
+    allRuns.forEach(function (r) {
+      var tr = el("tr", null);
+      var th = el("th", { scope: "row" });
+      th.appendChild(el("a", { href: "#" + r.slug }, modelBase(r)));
+      var t = tierOf(r);
+      if (t !== "default") th.appendChild(el("div", { "class": "run-id" }, tierShort(t)));
+      tr.appendChild(th);
+      tr.appendChild(el("td", { "class": "num" }, pct(r.accuracy)));
+      tr.appendChild(el("td", null, reasoningLabel(r)));
+      var d = typeof r.timestamp === "string" ? fmtDate(r.timestamp) : null;
+      tr.appendChild(el("td", null, d || "not recorded"));
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(scrollWrap(table, "Index of runs"));
+  }
+
+  function renderArchive(allRuns) {
+    var box = $("run-archive");
+    if (!box) return;
+    while (box.firstChild) box.removeChild(box.firstChild);
+    allRuns.forEach(function (r) {
+      var sec = el("section", { "class": "run-entry", id: r.slug });
+      sec.appendChild(el("h2", null, shortName(r)));
+      if (typeof r.model === "string" && r.model) {
+        sec.appendChild(el("p", { "class": "run-id" }, "Model id: " + r.model));
+      }
+      var dl = el("dl", { "class": "facts" });
+      function row(term, value) {
+        dl.appendChild(el("dt", null, term));
+        dl.appendChild(el("dd", null, value));
+      }
+      var w = r.wilson_95 || {};
+      row("Accuracy", pct(r.accuracy) +
+        (isNum(w.lo) && isNum(w.hi) ? " (95% CI " + pct(w.lo) + "–" + pct(w.hi) + ")" : ""));
+      row("Correct", isNum(r.correct) && isNum(r.total) ? r.correct + " / " + r.total : "n/a");
+      var inv = r.invalid || {};
+      row("Invalid outputs", isNum(inv.count) && isNum(r.total)
+        ? inv.count + " (" + pct(isNum(inv.rate) ? inv.rate : inv.count / r.total) + ")" : "n/a");
+      var lat = r.latency_ms || {};
+      row("Latency (median / p95)", fmtMs(lat.median) + " / " + fmtMs(lat.p95));
+      row("Reasoning", reasoningLabel(r) + " — " + tierShort(tierOf(r)) + " group");
+      row("Endpoint", typeof r.endpoint === "string" && r.endpoint ? r.endpoint : "not recorded");
+      row("Max tokens", r.max_new_tokens !== undefined && r.max_new_tokens !== null
+        ? String(r.max_new_tokens) : "not recorded");
+      var d = typeof r.timestamp === "string" ? fmtDate(r.timestamp) : null;
+      row("Run date", d ? d + " (UTC)" : "not recorded");
+      if (typeof r.prompt_template_hash === "string" && r.prompt_template_hash) {
+        row("Prompt hash", r.prompt_template_hash.slice(0, 12) + "…");
+      }
+      sec.appendChild(dl);
+      sec.appendChild(evidenceLinks(r.evidence || {}));
+      box.appendChild(sec);
+    });
   }
 
   /* ---------------- skipped ---------------- */
 
   function renderSkipped(skipped) {
     var body = $("skipped-body");
-    while (body.firstChild) body.removeChild(body.firstChild);
     var summary = $("skipped-summary");
+    if (!body || !summary) return;
+    while (body.firstChild) body.removeChild(body.firstChild);
     if (!skipped || !skipped.length) {
       summary.textContent = "Skipped or incomplete runs (0)";
       body.appendChild(el("p", { "class": "small" }, "No runs were skipped."));
       return;
     }
     summary.textContent = "Skipped or incomplete runs (" + skipped.length + ")";
-    var ul = el("ul", null);
+    var ul = el("ul", { "class": "tight" });
     skipped.forEach(function (s) {
       var slug = (s && typeof s.slug === "string") ? s.slug : "unknown run";
       var reason = (s && typeof s.reason === "string") ? s.reason : "reason not recorded";
@@ -526,49 +708,72 @@
     body.appendChild(ul);
   }
 
-  /* ---------------- header / footer meta ---------------- */
+  /* ---------------- meta ---------------- */
 
   function renderMeta(payload) {
     var runs = Array.isArray(payload.runs) ? payload.runs : [];
+    var foot = $("footer-line");
+    if (foot) {
+      var gen = typeof payload.generated_at === "string" ? fmtDate(payload.generated_at) : null;
+      foot.textContent = "KoBALT-700 benchmark record." +
+        (gen ? " Data generated " + gen + " (UTC)" : "") +
+        " from run directories via site/build.py.";
+    }
+    var meta = $("report-meta");
+    if (!meta) return;
+    while (meta.firstChild) meta.removeChild(meta.firstChild);
     var stamps = runs
       .map(function (r) { return typeof r.timestamp === "string" ? r.timestamp : null; })
-      .filter(Boolean)
-      .sort();
-    var meta = $("report-meta");
-    while (meta.firstChild) meta.removeChild(meta.firstChild);
-    var nPrimary = runs.filter(function (r) { return r.category !== "ablation"; }).length;
-    var nAbl = runs.length - nPrimary;
-    var itemCount = payload.item_count;
+      .filter(Boolean).sort();
+    var nDef = runs.filter(function (r) { return tierOf(r) === "default"; }).length;
     var parts = [];
     if (stamps.length) {
-      var first = fmtDate(stamps[0]);
-      var last = fmtDate(stamps[stamps.length - 1]);
-      parts.push(first === last || !last ? first : first + " – " + last);
+      var first = fmtDate(stamps[0]), last = fmtDate(stamps[stamps.length - 1]);
+      if (first) parts.push(first === last || !last ? first : first + " – " + last);
     }
-    parts.push(isNum(itemCount) ? itemCount + " items per run" : "item count not reported");
-    parts.push(runs.length + " complete runs (" + nPrimary + " primary, " + nAbl + " ablation" + (nAbl === 1 ? "" : "s") + ")");
-    meta.textContent = "Evaluation scope: " + parts.join(" · ") + ".";
-    var foot = $("footer-line");
-    var gen = typeof payload.generated_at === "string" ? fmtDate(payload.generated_at) : null;
-    foot.textContent = "KoBALT-700 research report." +
-      (gen ? " Data generated " + gen + " (UTC)" : "") +
-      " from run directories; see evidence links per run.";
+    if (isNum(payload.item_count)) parts.push(payload.item_count + " items per run");
+    parts.push(runs.length + " configurations (" + nDef + " provider-default)");
+    meta.textContent = parts.join(" · ") + ".";
   }
 
   /* ---------------- main ---------------- */
 
+  // Deferred reveal (CLS guard): dynamic regions are display:none until this
+  // runs, so the whole data render lands in a single frame below already
+  // painted static content. Nothing previously painted moves, which keeps
+  // Cumulative Layout Shift near zero. Always called exactly once per load,
+  // on success and on failure alike, so content is never hidden indefinitely.
+  function reveal() {
+    document.body.classList.add("is-ready");
+    var main = $("main");
+    if (main) main.removeAttribute("aria-busy");
+    // Restore deep links (e.g. runs.html#<slug>): the target was hidden at
+    // parse time, so re-resolve the fragment after reveal.
+    try {
+      if (typeof window.location.hash === "string" && window.location.hash.length > 1) {
+        var t = document.getElementById(window.location.hash.slice(1));
+        if (t && typeof t.scrollIntoView === "function") t.scrollIntoView();
+      }
+    } catch (e) { /* scrolling is best-effort */ }
+  }
+
   function fail(message) {
     setStatus(message, true);
-    chartError("overall-chart", "Overall chart unavailable: " + message);
-    chartError("domain-chart", "Domain chart unavailable: " + message);
-    chartError("level-chart", "Difficulty chart unavailable: " + message);
-    var cards = $("run-cards");
-    while (cards.firstChild) cards.removeChild(cards.firstChild);
-    cards.appendChild(el("p", { "class": "small" }, "Results could not be loaded. " + message));
+    ["overall-chart", "domain-chart", "level-chart"].forEach(function (id) {
+      chartError(id, "Unavailable: " + message);
+    });
+    var box = $("findings");
+    if (box) {
+      while (box.firstChild) box.removeChild(box.firstChild);
+      box.appendChild(el("li", null, "Findings unavailable: " + message));
+    }
     renderSkipped([]);
+    reveal();
   }
 
   function init() {
+    var main = $("main");
+    if (main) main.setAttribute("aria-busy", "true");
     fetch("results.json", { cache: "no-store" })
       .then(function (resp) {
         if (!resp.ok) throw new Error("results.json returned HTTP " + resp.status);
@@ -579,34 +784,43 @@
           fail("results file is missing the runs list.");
           return;
         }
-        var runs = payload.runs;
+        var runs = payload.runs.filter(Boolean);
         if (!runs.length) {
           fail("no completed runs found in the results file.");
           return;
         }
-        var primary = runs.filter(function (r) { return r && r.category !== "ablation"; });
-        var ablations = runs.filter(function (r) { return r && r.category === "ablation"; });
+        var tiers = {
+          defaultRun: runs.filter(function (r) { return tierOf(r) === "default"; }),
+          constrained: runs.filter(function (r) { return tierOf(r) === "constrained"; }),
+          disabled: runs.filter(function (r) { return tierOf(r) === "disabled"; })
+        };
+        var allPrimary = tiers.defaultRun.concat(tiers.constrained);
 
         renderMeta(payload);
-        renderOverallChart(primary);
-        renderCards(primary);
-        var okD = renderBreakdownChart("domain-chart", primary, "by_domain", "domain");
-        renderBreakdownTable("domain-table-wrap", primary, "by_domain", "Domain");
-        var okL = renderBreakdownChart("level-chart", primary, "by_level", "difficulty level");
-        var levelNames = breakdownGroups(primary, "by_level");
-        renderBreakdownTable("level-table-wrap", primary, "by_level", "Level");
-        renderAblations(primary, ablations);
-        renderReliability(primary.concat(ablations));
+        renderOverallChart(tiers.defaultRun);
+        renderFindings(tiers);
+        renderTierTables(tiers);
+        var chartRuns = tiers.defaultRun;
+        var tableRuns = allPrimary;
+        var okD = renderBreakdownChart("domain-chart", chartRuns, "by_domain", "domain");
+        renderBreakdownTable("domain-table-wrap", tableRuns, "by_domain", "Domain", true);
+        var okL = renderBreakdownChart("level-chart", chartRuns, "by_level", "difficulty level");
+        renderBreakdownTable("level-table-wrap", tableRuns, "by_level", "Level", true);
+        renderAblations(tiers.disabled, allPrimary);
+        renderReliability(runs);
+        renderRunIndex(runs);
+        renderArchive(runs);
         renderSkipped(payload.skipped);
 
         var notes = [];
-        if (!okD) notes.push("domain chart unavailable");
-        if (!okL) notes.push("difficulty chart unavailable");
-        if (!levelNames.length) notes.push("difficulty data missing");
-        setStatus("Loaded " + primary.length + " primary run" +
-          (primary.length === 1 ? "" : "s") + " and " + ablations.length +
-          " ablation" + (ablations.length === 1 ? "" : "s") + "." +
+        if ($("domain-chart") && !okD) notes.push("domain chart unavailable");
+        if ($("level-chart") && !okL) notes.push("difficulty chart unavailable");
+        setStatus("Loaded " + runs.length + " configurations (" +
+          tiers.defaultRun.length + " provider-default, " +
+          tiers.constrained.length + " reasoning-limited, " +
+          tiers.disabled.length + " reasoning-disabled)." +
           (notes.length ? " Note: " + notes.join("; ") + "." : ""));
+        reveal();
       })
       .catch(function (err) {
         fail(err && err.message ? err.message : "could not load results.json.");

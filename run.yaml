@@ -1,12 +1,15 @@
 backend:
   family: api # api | transformers | vllm
-  model: dep53i6olyyo9w8
+  model: openai/gpt-6-astra
   api_provider: openai # openai | anthropic (only when family == api)
-  endpoint: https://api.friendli.ai/dedicated/v1 # optional, for OpenAI-compatible endpoints
+  endpoint: https://openrouter.ai/api/v1 # optional, for OpenAI-compatible endpoints
   engine_opts:
     extra_body:
-      chat_template_kwargs:
-        enable_thinking: false
+      provider:
+        only:
+          - openai/flex
+      # chat_template_kwargs:
+      #   enable_thinking: false
   max_retries: 3
   concurrency: 1 # 1 = sequential (upstream default)
 generation:

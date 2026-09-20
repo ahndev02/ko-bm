@@ -1,33 +1,30 @@
-/* KoBALT-700 research report — quiet, paper-like, system fonts only. */
+/* KoBALT-700 benchmark record — document style.
+   White paper, near-black ink, one accent. Serif title, system sans body. */
 
 :root {
-  --paper: #fbfaf7;
-  --surface: #ffffff;
-  --ink: #201d18;
-  --muted: #575046;
-  --line: #e0dacd;
-  --accent: #1e5b4c;
-  --accent-soft: #e9f0ec;
-  --caution-bg: #f7f1e1;
-  --caution-border: #8a6410;
-  --max-measure: 44rem;
-  --radius: 6px;
+  --bg: #ffffff;
+  --ink: #1a1a1a;
+  --muted: #545454;
+  --line: #d8d8d8;
+  --accent: #0f5b8f;
+  --accent-dark: #0a4066;
+  --track: #ececec;
+  --note-bg: #f6f6f6;
+  --max-measure: 46rem;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html {
-  -webkit-text-size-adjust: 100%;
-}
+html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
-  background: var(--paper);
+  background: var(--bg);
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans",
-    "Helvetica Neue", Arial, sans-serif;
-  font-size: 1.0625rem;
-  line-height: 1.65;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.6;
 }
 
 .measure {
@@ -36,7 +33,6 @@ body {
   padding-inline: 1.25rem;
 }
 
-/* Skip link */
 .skip-link {
   position: absolute;
   left: -9999px;
@@ -46,194 +42,153 @@ body {
   padding: 0.6rem 1rem;
   z-index: 100;
 }
-.skip-link:focus {
-  left: 0.5rem;
-  top: 0.5rem;
-}
+.skip-link:focus { left: 0.5rem; top: 0.5rem; }
 
-/* Focus everywhere: always visible */
+a { color: var(--accent); }
+a:hover { color: var(--accent-dark); }
+a:visited { color: var(--accent-dark); }
+
 a:focus-visible,
 button:focus-visible,
 summary:focus-visible,
 [tabindex]:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 2px;
 }
 
-/* Header */
-.site-header {
-  padding: 2.5rem 0 1.75rem;
-  border-bottom: 1px solid var(--line);
+/* Masthead */
+.masthead {
+  border-bottom: 2px solid var(--ink);
+  padding: 1.5rem 0 1rem;
 }
-.kicker {
-  margin: 0 0 0.5rem;
-  font-size: 0.85rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
+.masthead .site-title {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-size: 1.6rem;
+  line-height: 1.25;
+  margin: 0 0 0.15rem;
 }
-.site-header h1 {
-  margin: 0 0 0.75rem;
-  font-size: 2rem;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
+.masthead .site-title a {
+  color: var(--ink);
+  text-decoration: none;
 }
-.lede { margin: 0 0 0.75rem; }
-.meta-line {
-  margin: 0 0 0.5rem;
+.masthead .site-title a:hover { text-decoration: underline; }
+.masthead .standfirst {
+  margin: 0;
   font-size: 0.95rem;
   color: var(--muted);
 }
-.link-row {
-  margin: 0 0 1.25rem;
-  font-size: 0.95rem;
-}
-.link-row a { margin-inline: 0.15rem; }
-
-a { color: var(--accent); }
-a:hover { text-decoration-thickness: 2px; }
-a:visited { color: #17473b; }
-
-.caveat {
-  background: var(--caution-bg);
-  border: 1px solid var(--caution-border);
-  border-left-width: 5px;
-  border-radius: var(--radius);
-  padding: 0.85rem 1rem;
-}
-.caveat p { margin: 0; }
-.caveat strong { color: var(--ink); }
-
-/* Nav */
 .site-nav {
   border-bottom: 1px solid var(--line);
-  background: var(--paper);
 }
 .site-nav ul {
   list-style: none;
   margin: 0;
-  padding: 0.6rem 1.25rem;
+  padding: 0.55rem 1.25rem;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 1rem;
-  font-size: 0.92rem;
+  gap: 0.2rem 1.25rem;
+  font-size: 0.95rem;
 }
 .site-nav a { text-decoration: none; }
 .site-nav a:hover { text-decoration: underline; }
-
-/* Sections */
-main section {
-  padding: 1.75rem 0 0.5rem;
+.site-nav a[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
-main section + section {
-  border-top: 1px solid var(--line);
-  margin-top: 1.25rem;
+
+/* Article */
+h1 {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-size: 1.9rem;
+  line-height: 1.25;
+  margin: 0 0 0.75rem;
 }
 h2 {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
   font-size: 1.35rem;
   line-height: 1.3;
-  margin: 0 0 0.6rem;
+  margin: 0 0 0.5rem;
 }
-section p { margin: 0 0 0.9rem; }
-.small { font-size: 0.9rem; color: var(--muted); }
-
-.status {
-  margin: 1.25rem 0 0;
-  font-size: 0.95rem;
-  color: var(--muted);
+h3 {
+  font-size: 1.05rem;
+  margin: 0 0 0.4rem;
 }
+main { padding: 1.75rem 0 1rem; }
+main section { margin-bottom: 2rem; }
+section > p, li > p { max-width: 100%; }
+p { margin: 0 0 0.85rem; }
+.small { font-size: 0.88rem; color: var(--muted); }
+.meta-line { font-size: 0.92rem; color: var(--muted); }
+.status { font-size: 0.92rem; color: var(--muted); }
 .status.error { color: #8c1d18; }
 
-/* Run cards: single column at every width. The narrow measure keeps prose
-   readable; a two-column split left ~315px per card and crushed the
-   definition-list values, so cards stack full-measure instead. */
-.cards {
-  list-style: none;
-  margin: 1rem 0 0;
-  padding: 0;
-  display: grid;
-  gap: 1rem;
-}
-.card {
-  background: var(--surface);
+.caveat {
+  background: var(--note-bg);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 1.25rem 1.35rem;
+  border-left: 4px solid var(--ink);
+  padding: 0.75rem 1rem;
+  margin: 1rem 0 1.5rem;
 }
-.card.lead { border-left: 5px solid var(--accent); }
-.card h3 {
-  margin: 0 0 0.15rem;
-  font-size: 1.1rem;
-  line-height: 1.4;
-  overflow-wrap: break-word;
+.caveat p { margin: 0; }
+
+ul.tight, ol.tight { padding-left: 1.3rem; }
+ul.tight li, ol.tight li { margin-bottom: 0.35rem; }
+
+/* Findings */
+.findings {
+  list-style: none;
+  margin: 1rem 0;
+  padding: 0;
+  border-top: 2px solid var(--ink);
 }
-.card .model-id {
-  margin: 0 0 0.6rem;
+.findings li {
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.findings li:last-child { border-bottom: 2px solid var(--ink); }
+
+/* Figures and charts */
+figure { margin: 1rem 0; }
+.chart-block figcaption,
+figcaption.caption {
   font-size: 0.85rem;
   color: var(--muted);
-  overflow-wrap: break-word;
-}
-.card dl {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.35rem 1rem;
-  margin: 0;
-  font-size: 0.95rem;
-}
-.card dt { color: var(--muted); }
-.card dd {
-  margin: 0;
-  min-width: 0; /* let long values wrap instead of forcing the card wider */
-  overflow-wrap: break-word;
-  font-variant-numeric: tabular-nums;
-}
-.card .score { font-size: 1.15rem; font-weight: 650; }
-.card .evidence {
-  margin-top: 0.6rem;
-  font-size: 0.9rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.75rem;
-}
-
-/* Charts */
-.chart-block { margin: 1rem 0; }
-.chart-block figcaption {
-  font-size: 0.88rem;
-  color: var(--muted);
-  margin-top: 0.4rem;
+  margin-top: 0.35rem;
 }
 .chart svg {
   display: block;
   width: 100%;
   height: auto;
-  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
 }
 .chart-error {
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   color: var(--muted);
   border: 1px dashed var(--line);
-  border-radius: var(--radius);
   padding: 0.75rem 1rem;
 }
 
-/* Tables */
-.table-wrap { overflow-x: auto; }
+/* Ruled tables */
+.table-scroll { overflow-x: auto; }
+.table-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
-  background: var(--surface);
 }
 caption {
   text-align: left;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--muted);
   padding-bottom: 0.4rem;
+}
+thead th {
+  border-top: 2px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+  font-weight: 700;
 }
 th, td {
   text-align: left;
@@ -241,91 +196,105 @@ th, td {
   border-bottom: 1px solid var(--line);
   vertical-align: top;
 }
-th { font-weight: 650; }
-thead th { border-bottom: 2px solid var(--muted); }
 tbody tr:last-child th,
-tbody tr:last-child td { border-bottom: none; }
+tbody tr:last-child td { border-bottom: 2px solid var(--ink); }
 td.num, th.num { text-align: right; white-space: nowrap; }
+/* Comparison tables carry seven columns; slightly tighter padding keeps
+   them inside the measure on desktop. Smaller screens use the scroll region. */
+table.compare th, table.compare td { padding: 0.4rem 0.45rem; }
+/* Accuracy and count cells may wrap after their spaces so 7-column
+   comparison tables fit the measure; the CI token itself never breaks. */
+td.num.soft { white-space: normal; }
+tr.tier-head th {
+  background: var(--note-bg);
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--ink);
+}
+.run-id { font-size: 0.82rem; color: var(--muted); overflow-wrap: break-word; }
 
-/* Disclosures */
-.disclosure {
-  margin: 0.75rem 0 1rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
+/* Run archive entries */
+.run-entry {
+  border-top: 2px solid var(--ink);
+  padding-top: 0.75rem;
+  margin-bottom: 1.75rem;
 }
-.disclosure summary {
-  cursor: pointer;
-  padding: 0.7rem 1rem;
-  font-weight: 600;
-  font-size: 0.95rem;
-}
-.disclosure .table-wrap { padding: 0 1rem 1rem; }
-.disclosure.subdued {
-  background: transparent;
-  color: var(--muted);
+.run-entry h2 { font-size: 1.2rem; overflow-wrap: break-word; }
+.run-entry dl.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0.5rem 0;
   font-size: 0.92rem;
 }
-.disclosure.subdued .table-wrap { padding: 0 1rem 1rem; }
+.run-entry dl.facts dt { color: var(--muted); }
+.run-entry dl.facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: break-word;
+  font-variant-numeric: tabular-nums;
+}
 
-/* Ablation pair */
-.ablation-pair {
-  background: var(--surface);
+/* Disclosures */
+details.disclosure {
+  margin: 0.75rem 0 1rem;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 1rem 1.1rem;
-  margin: 1rem 0;
 }
-.ablation-pair h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1.02rem;
-  overflow-wrap: anywhere;
+details.disclosure summary {
+  cursor: pointer;
+  padding: 0.6rem 0.9rem;
+  font-weight: 600;
+  font-size: 0.92rem;
 }
-.ablation-pair .delta {
-  font-size: 1.05rem;
-  font-weight: 650;
-}
-.ablation-note { font-size: 0.92rem; color: var(--muted); }
+details.disclosure .table-scroll { padding: 0 0.9rem 0.9rem; }
+details.subdued { color: var(--muted); font-size: 0.9rem; }
 
-/* Method */
-.method-list { padding-left: 1.25rem; }
-.method-list li { margin-bottom: 0.5rem; }
+/* Ablation panels */
+.ablation {
+  border-top: 2px solid var(--ink);
+  padding-top: 0.6rem;
+  margin: 1rem 0 1.5rem;
+}
+.ablation h3 { overflow-wrap: break-word; }
+.ablation .delta { font-weight: 700; }
+.ablation-note { font-size: 0.9rem; color: var(--muted); }
+
+/* Technical blocks */
 code, pre {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.88em;
+  font-size: 0.86em;
 }
 pre {
-  background: var(--surface);
+  background: var(--note-bg);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 0.9rem 1rem;
+  padding: 0.8rem 1rem;
   overflow-x: auto;
   line-height: 1.6;
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
-.prompt-block { margin: 0 0 1rem; }
-.prompt-caption {
-  font-size: 0.88rem;
-  color: var(--muted);
-  margin-bottom: 0.3rem;
-}
-.prompt-block pre { margin: 0; }
-.translation { font-size: 0.95rem; }
+.prompt-caption { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.25rem; }
 
 /* Footer */
 .site-footer {
-  border-top: 1px solid var(--line);
-  margin-top: 2rem;
-  padding: 1.25rem 0 2.5rem;
+  border-top: 2px solid var(--ink);
+  margin-top: 1rem;
+  padding: 1rem 0 2.5rem;
 }
 
-/* Wider screens: roomier type only (cards stay single-column by design). */
+/* Deferred reveal (CLS guard): while .js is set and body lacks .is-ready,
+   dynamic regions stay out of layout entirely, so async insertion of tables
+   and charts cannot shift painted content. charts.js adds .is-ready once
+   content — or an error message — is rendered. Without JS the .js class is
+   never set, so everything stays visible exactly as before. */
+.js .defer { display: none; }
+body.is-ready .defer { display: block; }
+
+/* Wider screens */
 @media (min-width: 46rem) {
-  .site-header h1 { font-size: 2.4rem; }
+  h1 { font-size: 2.2rem; }
+  .masthead .site-title { font-size: 1.4rem; }
 }
 
-/* Reduced motion: no decorative animation anywhere (none is used). */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after {

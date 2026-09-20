@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KoBALT-700 benchmark record — Results</title>
+<meta name="description" content="Tiered comparison of KoBALT-700 runs: provider-default results, reasoning-limited runs, reasoning-disabled ablations, domain and difficulty breakdowns, reliability.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header class="masthead">
+  <div class="measure">
+    <p class="site-title"><a href="index.html">KoBALT-700 benchmark record</a></p>
+    <p class="standfirst">Independent evaluation runs on a Korean linguistics benchmark, with evidence.</p>
+  </div>
+</header>
+
+<nav class="site-nav" aria-label="Site sections">
+  <div class="measure">
+    <ul>
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="results.html" aria-current="page">Results</a></li>
+      <li><a href="method.html">Method</a></li>
+      <li><a href="runs.html">Runs &amp; evidence</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main id="main">
+  <div class="measure">
+
+    <h1>Results</h1>
+    <p class="meta-line" id="report-meta">Loading run metadata&hellip;</p>
+    <p id="status" class="status" role="status" aria-live="polite">Loading results&hellip;</p>
+
+    <section id="tiers" class="defer" aria-labelledby="tiers-h">
+      <h2 id="tiers-h">Comparison, by reasoning group</h2>
+      <p>Runs are grouped by provider reasoning setting because the setting changes scores substantially. <strong>The groups are not directly comparable with each other;</strong> only rows within the first table share identical conditions. Accuracy is strict exact match (chance: 10%).</p>
+      <h3>Provider-default reasoning</h3>
+      <div id="tier-default-wrap"></div>
+      <h3>Reasoning-limited (explicit minimal/low effort)</h3>
+      <div id="tier-constrained-wrap"></div>
+      <h3>Reasoning disabled</h3>
+      <div id="tier-disabled-wrap"></div>
+    </section>
+
+    <section id="domains" class="defer" aria-labelledby="domains-h">
+      <h2 id="domains-h">By domain</h2>
+      <p>Five linguistic domains. Small domains are noisier (Morphology: 42 items; Syntax: 300). Charts show provider-default runs; tables include reasoning-limited runs, marked.</p>
+      <figure class="chart-block">
+        <div id="domain-chart" class="chart" role="img" aria-label="Bar chart of accuracy by linguistic domain for provider-default runs. Exact values are in the table below."></div>
+        <figcaption class="caption">Provider-default runs. Group labels include item counts.</figcaption>
+      </figure>
+      <details class="disclosure">
+        <summary>Exact domain values</summary>
+        <div class="table-scroll-host" id="domain-table-wrap"></div>
+      </details>
+    </section>
+
+    <section id="difficulty" class="defer" aria-labelledby="difficulty-h">
+      <h2 id="difficulty-h">By difficulty</h2>
+      <p>Level 1: 182 items; Level 2: 220; Level 3: 298. Charts show provider-default runs; tables include reasoning-limited runs, marked.</p>
+      <figure class="chart-block">
+        <div id="level-chart" class="chart" role="img" aria-label="Bar chart of accuracy by difficulty level for provider-default runs. Exact values are in the table below."></div>
+        <figcaption class="caption">Provider-default runs. Group labels include item counts.</figcaption>
+      </figure>
+      <details class="disclosure">
+        <summary>Exact difficulty values</summary>
+        <div class="table-scroll-host" id="level-table-wrap"></div>
+      </details>
+    </section>
+
+    <section id="ablations" class="defer" aria-labelledby="ablations-h">
+      <h2 id="ablations-h">Reasoning comparisons</h2>
+      <p>Paired runs of the same model under different reasoning settings. Unpaired observations are labeled as such — they show where a configuration landed, not what the setting changed.</p>
+      <div id="ablation-body"></div>
+    </section>
+
+    <section id="reliability" class="defer" aria-labelledby="reliability-h">
+      <h2 id="reliability-h">Reliability</h2>
+      <p>Invalid means no single A–J choice could be extracted; invalid outputs count as wrong. Latency depends on the endpoint and deployment behind each run and <strong>should not be read as intrinsic model speed</strong>.</p>
+      <div id="reliability-table-wrap"></div>
+    </section>
+
+  </div>
+</main>
+
+<footer class="site-footer defer">
+  <div class="measure">
+    <p id="footer-line" class="small">KoBALT-700 benchmark record.</p>
+    <noscript><p class="small">Numbers on this page load from <code>results.json</code> and need JavaScript enabled.</p></noscript>
+  </div>
+</footer>
+
+<script src="charts.js" defer></script>
+</body>
+</html>

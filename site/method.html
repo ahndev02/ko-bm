@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KoBALT-700 benchmark record — Method</title>
+<meta name="description" content="Evaluation method: decoding settings, exact Korean prompt, answer extraction and scoring, and reproduction instructions.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header class="masthead">
+  <div class="measure">
+    <p class="site-title"><a href="index.html">KoBALT-700 benchmark record</a></p>
+    <p class="standfirst">Independent evaluation runs on a Korean linguistics benchmark, with evidence.</p>
+  </div>
+</header>
+
+<nav class="site-nav" aria-label="Site sections">
+  <div class="measure">
+    <ul>
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="results.html">Results</a></li>
+      <li><a href="method.html" aria-current="page">Method</a></li>
+      <li><a href="runs.html">Runs &amp; evidence</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main id="main">
+  <div class="measure">
+
+    <h1>Method</h1>
+
+    <section id="method" aria-labelledby="method-h">
+      <h2 id="method-h">Evaluation protocol</h2>
+      <ul class="tight">
+        <li><strong>Decoding:</strong> deterministic settings throughout — <code>do_sample: false</code> (greedy where the backend supports it; <code>temperature: 0.0</code> on the API backends), capped at <code>max_new_tokens: 2048</code>. All runs share one prompt template (full hash recorded in each run's config snapshot).</li>
+        <li><strong>Reasoning settings</strong> are the one deliberate variable: most runs use the provider default, some request minimal/low effort, and two disable reasoning. The <a href="results.html#tiers">Results</a> page keeps these groups separate.</li>
+        <li><strong>Extraction and scoring:</strong> strict regular expression <code>정답은\s*(.*?)\s*입니다</code>; from each match, A–J letters are collected in order. A run is correct only if the extracted string is exactly the gold letter.</li>
+        <li><strong>Invalid outputs count as wrong.</strong> A missing or malformed final-answer phrase scores 0; it is never excluded.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="prompt-h">
+      <h2 id="prompt-h">Prompt (exactly as sent)</h2>
+      <p>System message, original Korean:</p>
+      <pre lang="ko">당신은 문제를 해결하는 전문가입니다.</pre>
+      <p>User message template, original Korean (<code>{question}</code> replaced by the item text):</p>
+      <pre lang="ko">다음 문제에 대해서 충분히 생각하고 추론하여, 10개의 보기(A, B, C, D, E, F, G, H, I, J) 중 정답을 고르세요.
+
+{question}
+
+답변은 반드시 다음 형식을 엄격히 지켜야 합니다: "정답은 [정답 보기]입니다."로 끝나야하고, [정답 보기]는 A, B, C, D, E, F, G, H, I, J 중 하나여야 합니다.정답: 문제를 풀기 위해, 한 번 천천히 생각해봅시다.</pre>
+      <p><strong>English translation</strong> (for reference only; models saw the Korean above): “Think through the following problem and choose the correct answer from the 10 options (A, B, C, D, E, F, G, H, I, J). [question] Your answer must strictly keep the following form: it must end with ‘정답은 [choice]입니다.’ ([The answer is [choice].]), where [choice] is one of A–J. Answer: To solve this, let us think slowly.”</p>
+    </section>
+
+    <section id="reproduce" aria-labelledby="reproduce-h">
+      <h2 id="reproduce-h">Reproduction</h2>
+      <p>Each run directory keeps a config snapshot and a scored results file (see <a href="runs.html">Runs &amp; evidence</a>). This site is generated from those files; raw model predictions are not published. Regenerate the data file with:</p>
+      <pre>python3 site/build.py</pre>
+      <p class="small">This reads completed run directories under <code>runs/</code> and writes <code>site/results.json</code> plus evidence copies under <code>site/data/runs/&lt;run&gt;/</code>. Incomplete runs are skipped and listed separately.</p>
+      <p class="small">Dataset note: the recorded dataset revision is <code>0.0.0</code>, a placeholder rather than a content hash, so exact dataset identity rests on the benchmark release (see upstream links on the <a href="index.html">Overview</a> page).</p>
+    </section>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="measure">
+    <p id="footer-line" class="small">KoBALT-700 benchmark record.</p>
+  </div>
+</footer>
+
+<script src="charts.js" defer></script>
+</body>
+</html>

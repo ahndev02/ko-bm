@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-20T16:10:17Z",
+  "generated_at": "2026-09-20T18:12:39Z",
   "generator": "site/build.py",
   "item_count": 700,
   "dataset": {
@@ -46,6 +46,105 @@
     ]
   },
   "runs": [
+    {
+      "slug": "run-20260920-171741-gpt-6-astra",
+      "path": "runs/run-20260920-171741-gpt-6-astra",
+      "model": "openai/gpt-6-astra",
+      "label": "gpt-6-astra",
+      "timestamp": "2026-09-20T17:17:41Z",
+      "backend": "api",
+      "provider": "openai",
+      "endpoint": "https://openrouter.ai/api/v1",
+      "reasoning_mode": "provider-default",
+      "reasoning_effort": null,
+      "category": "primary",
+      "engine_extra_body": {
+        "provider": {
+          "only": [
+            "openai/flex"
+          ]
+        }
+      },
+      "max_new_tokens": 2048,
+      "prompt_template_hash": "3941207196edd4239a011e10649c790ed79a747490238330c32b2a2ed35383e1",
+      "dataset": {
+        "name": "snunlp/KoBALT-700",
+        "revision": "0.0.0"
+      },
+      "total": 700,
+      "correct": 631,
+      "accuracy": 0.9014285714285715,
+      "wilson_95": {
+        "lo": 0.877107,
+        "hi": 0.921368
+      },
+      "by_domain": [
+        {
+          "name": "Morphology",
+          "n": 42,
+          "correct": 41,
+          "accuracy": 0.9761904761904762
+        },
+        {
+          "name": "Phonetics/Phonology",
+          "n": 62,
+          "correct": 57,
+          "accuracy": 0.9193548387096774
+        },
+        {
+          "name": "Pragmatics",
+          "n": 81,
+          "correct": 78,
+          "accuracy": 0.9629629629629629
+        },
+        {
+          "name": "Semantics",
+          "n": 215,
+          "correct": 180,
+          "accuracy": 0.8372093023255814
+        },
+        {
+          "name": "Syntax",
+          "n": 300,
+          "correct": 275,
+          "accuracy": 0.9166666666666666
+        }
+      ],
+      "by_level": [
+        {
+          "name": "1",
+          "n": 182,
+          "correct": 181,
+          "accuracy": 0.9945054945054945
+        },
+        {
+          "name": "2",
+          "n": 220,
+          "correct": 211,
+          "accuracy": 0.9590909090909091
+        },
+        {
+          "name": "3",
+          "n": 298,
+          "correct": 239,
+          "accuracy": 0.802013422818792
+        }
+      ],
+      "invalid": {
+        "count": 0,
+        "rate": 0.0
+      },
+      "empty_raw_output": 0,
+      "latency_ms": {
+        "n": 700,
+        "median": 3183.0,
+        "p95": 8308.0
+      },
+      "evidence": {
+        "snapshot": "site/data/runs/run-20260920-171741-gpt-6-astra/config.snapshot.yaml",
+        "results": "site/data/runs/run-20260920-171741-gpt-6-astra/results.json"
+      }
+    },
     {
       "slug": "run-20260919-023453-gpt-5.6-sol-floor",
       "path": "runs/run-20260919-023453-gpt-5.6-sol-floor",

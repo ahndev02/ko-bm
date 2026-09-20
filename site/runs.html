@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KoBALT-700 benchmark record — Runs &amp; evidence</title>
+<meta name="description" content="Per-run archive: configuration, scores, latency, and evidence files for every KoBALT-700 run, plus skipped runs and full limitations.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header class="masthead">
+  <div class="measure">
+    <p class="site-title"><a href="index.html">KoBALT-700 benchmark record</a></p>
+    <p class="standfirst">Independent evaluation runs on a Korean linguistics benchmark, with evidence.</p>
+  </div>
+</header>
+
+<nav class="site-nav" aria-label="Site sections">
+  <div class="measure">
+    <ul>
+      <li><a href="index.html">Overview</a></li>
+      <li><a href="results.html">Results</a></li>
+      <li><a href="method.html">Method</a></li>
+      <li><a href="runs.html" aria-current="page">Runs &amp; evidence</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main id="main">
+  <div class="measure">
+
+    <h1>Runs &amp; evidence</h1>
+    <p class="meta-line" id="report-meta">Loading run metadata&hellip;</p>
+    <p id="status" class="status" role="status" aria-live="polite">Loading runs&hellip;</p>
+
+    <section class="defer" aria-labelledby="index-h">
+      <h2 id="index-h">Index</h2>
+      <div id="run-index-wrap"></div>
+    </section>
+
+    <div id="run-archive" class="defer"></div>
+
+    <details id="skipped" class="disclosure subdued defer">
+      <summary id="skipped-summary">Skipped or incomplete runs</summary>
+      <div id="skipped-body"></div>
+    </details>
+
+    <section id="limitations" class="defer" aria-labelledby="limitations-h">
+      <h2 id="limitations-h">Limitations</h2>
+      <ul class="tight">
+        <li>KoBALT-700 is a public benchmark, so prior exposure of these items in model training (contamination) is unknown and cannot be ruled out.</li>
+        <li>One run per configuration: there is no measure of run-to-run repeatability, and close scores may not reflect a real difference.</li>
+        <li>The recorded dataset revision is <code>0.0.0</code>, a placeholder — it is not content-addressed, so exact dataset identity rests on the benchmark release rather than a pinned hash.</li>
+        <li>Reasoning policies differ across runs (provider default, explicit minimal/low effort, disabled); comparisons across those settings are about configuration, not models alone.</li>
+        <li>Small subgroups are noisy: several subclasses have fewer than 20 items, and single items can move those percentages by several points. Treat domain and level breakdowns as descriptive.</li>
+      </ul>
+    </section>
+
+  </div>
+</main>
+
+<footer class="site-footer defer">
+  <div class="measure">
+    <p id="footer-line" class="small">KoBALT-700 benchmark record.</p>
+    <noscript><p class="small">Run details on this page load from <code>results.json</code> and need JavaScript enabled.</p></noscript>
+  </div>
+</footer>
+
+<script src="charts.js" defer></script>
+</body>
+</html>

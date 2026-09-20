@@ -27,16 +27,17 @@ Per-run derivations
 Model id, display label, slug/path, timestamp (parsed from the ``run-``
 dirname when possible), endpoint/provider, reasoning mode from
 ``engine_opts`` (``provider-default`` when absent/null, the explicit
-effort string when present), max tokens, prompt hash, dataset
+effort string when present, via nested ``reasoning.effort`` or scalar
+``reasoning_effort``), max tokens, prompt hash, dataset
 name/revision, accuracy/correct/total, 95% Wilson interval, per-domain
 and per-level tables, invalid-answer count/rate (``predicted_answer``
 that is not exactly one of ``A``-``J``), empty raw-output count, and
 median / nearest-rank p95 latency.
 
-An explicit ``reasoning.effort: none`` is classified as
-``category == "ablation"`` so it stays separable from primary results.
-Every other condition is preserved plainly (``engine_extra_body``);
-no fairness claims are made here.
+An explicit ``reasoning.effort: none`` (or ``reasoning_effort: none``) is
+classified as ``category == "ablation"`` so it stays separable from
+primary results. Every other condition is preserved plainly
+(``engine_extra_body``); no fairness claims are made here.
 
 Only ``config.snapshot.yaml`` and ``results.json`` are copied into
 ``site/data/``. Raw predictions and logs are never published, and no
@@ -469,23 +470,27 @@ def load_snapshot(path: str | Path) -> dict[str, Any]:
 # Small derivations
 # ---------------------------------------------------------------------------
 
-def find_reasoning_effort(engine_opts: Any) -> str | None:
+def find_reasoning_effort(engine_opts: Any, source: str = "engine_opts") -> str | None:
     """Return the explicit reasoning effort string, or None when absent/null.
 
-    Looks for a ``reasoning: {effort: ...}`` mapping anywhere inside
-    ``engine_opts`` (normally ``extra_body.reasoning.effort``). Depth-first
-    search in deterministic (sorted-key) order.
+    Recognizes both the nested ``reasoning: {effort: X}`` mapping and the
+    scalar ``reasoning_effort: X`` key, anywhere inside ``engine_opts``
+    (normally under ``extra_body``). Search is depth-first in
+    deterministic (sorted-key) order; null values count as absent.
+
+    When disagreeing explicit values are present in either form, raises
+    :class:`BuildError` naming ``source`` instead of silently picking one,
+    since the choice can flip a run between primary and ablation.
     """
     found: list[Any] = []
 
     def _search(node: Any) -> None:
-        if found:
-            return
         if isinstance(node, dict):
             reasoning = node.get("reasoning")
             if isinstance(reasoning, dict) and "effort" in reasoning:
                 found.append(reasoning["effort"])
-                return
+            if "reasoning_effort" in node:
+                found.append(node["reasoning_effort"])
             for key in sorted(node, key=str):
                 _search(node[key])
         elif isinstance(node, list):
@@ -493,9 +498,13 @@ def find_reasoning_effort(engine_opts: Any) -> str | None:
                 _search(entry)
 
     _search(engine_opts if isinstance(engine_opts, dict) else {})
-    if not found or found[0] is None:
-        return None
-    return str(found[0])
+    distinct = sorted({str(v) for v in found if v is not None})
+    if len(distinct) > 1:
+        raise BuildError(
+            f"conflicting reasoning effort values {distinct} in {source} "
+            "(nested 'reasoning.effort' vs scalar 'reasoning_effort')"
+        )
+    return distinct[0] if distinct else None
 
 
 def short_model_label(model_id: Any) -> str:
@@ -713,7 +722,7 @@ def summarize_run(run_dir: str | Path) -> dict[str, Any]:
         raise BuildError(f"{slug}: malformed run (no model id in snapshot or results)")
     model = str(model)
     engine_opts = backend.get("engine_opts")
-    effort = find_reasoning_effort(engine_opts)
+    effort = find_reasoning_effort(engine_opts, source=f"{slug}/config.snapshot.yaml")
     reasoning_mode = "provider-default" if effort is None else effort
     category = "ablation" if effort == "none" else "primary"
     short = short_model_label(model)

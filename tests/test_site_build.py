@@ -58,11 +58,13 @@ dataset:
 """
 
 
-def _engine_block(effort=_MISSING):
+def _engine_block(effort=_MISSING, style="nested"):
     if effort is _MISSING:
         return "  engine_opts:\n    extra_body: null\n"
     if effort is None:
         return "  engine_opts:\n    extra_body:\n      reasoning:\n        effort: null\n"
+    if style == "underscore":
+        return f"  engine_opts:\n    extra_body:\n      reasoning_effort: {effort}\n"
     return f"  engine_opts:\n    extra_body:\n      reasoning:\n        effort: {effort}\n"
 
 
@@ -115,14 +117,14 @@ def results_for(records):
 
 
 def write_synthetic_run(parent, slug, records, *, model="testorg/test-model",
-                        effort=_MISSING, no_engine_opts=False,
+                        effort=_MISSING, effort_style="nested", no_engine_opts=False,
                         results_override=None, snapshot_extra_lines=None):
     rundir = Path(parent) / slug
     rundir.mkdir(parents=True, exist_ok=True)
     if no_engine_opts:
         engine_block = ""
     else:
-        engine_block = _engine_block(effort)
+        engine_block = _engine_block(effort, style=effort_style)
     snapshot = SNAPSHOT_TEMPLATE.format(
         model=model,
         endpoint="https://example.test/v1",
@@ -288,6 +290,61 @@ def test_ablation_classification(tmp_path):
     s_noeng = build.summarize_run(d_noeng)
     assert s_noeng["category"] == "primary"
     assert s_noeng["reasoning_mode"] == "provider-default"
+
+
+def test_reasoning_effort_underscore_form(tmp_path):
+    assert build.find_reasoning_effort({"extra_body": {"reasoning_effort": "low"}}) == "low"
+    assert build.find_reasoning_effort({"extra_body": {"reasoning_effort": None}}) is None
+    assert build.find_reasoning_effort({"extra_body": {"reasoning": {"effort": "minimal"}}}) == "minimal"
+    assert build.find_reasoning_effort(None) is None
+    assert build.find_reasoning_effort({}) is None
+    # agreeing duplicates across both forms are fine
+    assert build.find_reasoning_effort(
+        {"extra_body": {"reasoning": {"effort": "low"}, "reasoning_effort": "low"}}
+    ) == "low"
+
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    recs = three_records()
+    d_low = write_synthetic_run(
+        runs, "run-20260919-010203-low", recs, effort="low", effort_style="underscore"
+    )
+    s_low = build.summarize_run(d_low)
+    assert s_low["category"] == "primary"
+    assert s_low["reasoning_mode"] == "low"
+    assert s_low["reasoning_effort"] == "low"
+    assert "low" in s_low["label"]
+
+    d_none = write_synthetic_run(
+        runs, "run-20260919-010204-none", recs, effort="none", effort_style="underscore"
+    )
+    s_none = build.summarize_run(d_none)
+    assert s_none["category"] == "ablation"
+    assert s_none["reasoning_mode"] == "none"
+
+
+def test_reasoning_effort_conflict_fails(tmp_path):
+    with pytest.raises(BuildError, match="conflicting reasoning effort"):
+        build.find_reasoning_effort(
+            {"extra_body": {"reasoning": {"effort": "minimal"}, "reasoning_effort": "low"}},
+            source="test-snapshot",
+        )
+
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    recs = three_records()
+    rundir = write_synthetic_run(
+        runs, "run-20260919-010203-conflict", recs, effort="minimal"
+    )
+    snapshot_path = rundir / "config.snapshot.yaml"
+    text = snapshot_path.read_text(encoding="utf-8")
+    text = text.replace(
+        "      reasoning:\n        effort: minimal\n",
+        "      reasoning:\n        effort: minimal\n      reasoning_effort: low\n",
+    )
+    snapshot_path.write_text(text, encoding="utf-8")
+    with pytest.raises(BuildError, match="conflicting reasoning effort"):
+        build.summarize_run(rundir)
 
 
 def test_primary_runs_sort_before_ablations(tmp_path):

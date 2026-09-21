@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-20T18:12:39Z",
+  "generated_at": "2026-09-21T01:47:12Z",
   "generator": "site/build.py",
   "item_count": 700,
   "dataset": {
@@ -57,6 +57,7 @@
       "endpoint": "https://openrouter.ai/api/v1",
       "reasoning_mode": "provider-default",
       "reasoning_effort": null,
+      "reasoning_source": null,
       "category": "primary",
       "engine_extra_body": {
         "provider": {
@@ -156,6 +157,7 @@
       "endpoint": "https://openrouter.ai/api/v1",
       "reasoning_mode": "provider-default",
       "reasoning_effort": null,
+      "reasoning_source": null,
       "category": "primary",
       "engine_extra_body": null,
       "max_new_tokens": 2048,
@@ -249,6 +251,7 @@
       "endpoint": "https://openrouter.ai/api/v1",
       "reasoning_mode": "provider-default",
       "reasoning_effort": null,
+      "reasoning_source": null,
       "category": "primary",
       "engine_extra_body": null,
       "max_new_tokens": 2048,
@@ -342,6 +345,7 @@
       "endpoint": "https://openrouter.ai/api/v1",
       "reasoning_mode": "minimal",
       "reasoning_effort": "minimal",
+      "reasoning_source": "reasoning.effort",
       "category": "primary",
       "engine_extra_body": {
         "reasoning": {
@@ -439,6 +443,7 @@
       "endpoint": "https://openrouter.ai/api/v1",
       "reasoning_mode": "provider-default",
       "reasoning_effort": null,
+      "reasoning_source": null,
       "category": "primary",
       "engine_extra_body": null,
       "max_new_tokens": 2048,
@@ -532,6 +537,7 @@
       "endpoint": "https://openrouter.ai/api/v1",
       "reasoning_mode": "provider-default",
       "reasoning_effort": null,
+      "reasoning_source": null,
       "category": "primary",
       "engine_extra_body": {
         "provider": {
@@ -631,6 +637,7 @@
       "endpoint": "https://openrouter.ai/api/v1",
       "reasoning_mode": "provider-default",
       "reasoning_effort": null,
+      "reasoning_source": null,
       "category": "primary",
       "engine_extra_body": {
         "provider": {
@@ -730,6 +737,7 @@
       "endpoint": "https://openrouter.ai/api/v1",
       "reasoning_mode": "low",
       "reasoning_effort": "low",
+      "reasoning_source": "reasoning_effort",
       "category": "primary",
       "engine_extra_body": {
         "provider": {
@@ -820,103 +828,6 @@
       }
     },
     {
-      "slug": "run-20260917-032809-gemma-4-26B-A4B-it-qat-GGUF",
-      "path": "runs/run-20260917-032809-gemma-4-26B-A4B-it-qat-GGUF",
-      "model": "unsloth/gemma-4-26B-A4B-it-qat-GGUF",
-      "label": "gemma-4-26B-A4B-it-qat-GGUF",
-      "timestamp": "2026-09-17T03:28:09Z",
-      "backend": "api",
-      "provider": "openai",
-      "endpoint": "http://192.168.35.94:8888/v1",
-      "reasoning_mode": "provider-default",
-      "reasoning_effort": null,
-      "category": "primary",
-      "engine_extra_body": {
-        "chat_template_kwargs": {
-          "enable_thinking": false
-        }
-      },
-      "max_new_tokens": 2048,
-      "prompt_template_hash": "3941207196edd4239a011e10649c790ed79a747490238330c32b2a2ed35383e1",
-      "dataset": {
-        "name": "snunlp/KoBALT-700",
-        "revision": "0.0.0"
-      },
-      "total": 700,
-      "correct": 411,
-      "accuracy": 0.5871428571428572,
-      "wilson_95": {
-        "lo": 0.55029,
-        "hi": 0.623044
-      },
-      "by_domain": [
-        {
-          "name": "Morphology",
-          "n": 42,
-          "correct": 20,
-          "accuracy": 0.47619047619047616
-        },
-        {
-          "name": "Phonetics/Phonology",
-          "n": 62,
-          "correct": 27,
-          "accuracy": 0.43548387096774194
-        },
-        {
-          "name": "Pragmatics",
-          "n": 81,
-          "correct": 36,
-          "accuracy": 0.4444444444444444
-        },
-        {
-          "name": "Semantics",
-          "n": 215,
-          "correct": 134,
-          "accuracy": 0.6232558139534884
-        },
-        {
-          "name": "Syntax",
-          "n": 300,
-          "correct": 194,
-          "accuracy": 0.6466666666666666
-        }
-      ],
-      "by_level": [
-        {
-          "name": "1",
-          "n": 182,
-          "correct": 169,
-          "accuracy": 0.9285714285714286
-        },
-        {
-          "name": "2",
-          "n": 220,
-          "correct": 160,
-          "accuracy": 0.7272727272727273
-        },
-        {
-          "name": "3",
-          "n": 298,
-          "correct": 82,
-          "accuracy": 0.2751677852348993
-        }
-      ],
-      "invalid": {
-        "count": 103,
-        "rate": 0.147143
-      },
-      "empty_raw_output": 0,
-      "latency_ms": {
-        "n": 700,
-        "median": 76996.5,
-        "p95": 199981.0
-      },
-      "evidence": {
-        "snapshot": "site/data/runs/run-20260917-032809-gemma-4-26B-A4B-it-qat-GGUF/config.snapshot.yaml",
-        "results": "site/data/runs/run-20260917-032809-gemma-4-26B-A4B-it-qat-GGUF/results.json"
-      }
-    },
-    {
       "slug": "run-20260918-125513-solar-pro4",
       "path": "runs/run-20260918-125513-solar-pro4",
       "model": "solar-pro4",
@@ -927,6 +838,7 @@
       "endpoint": "https://api.upstage.ai/v1",
       "reasoning_mode": "provider-default",
       "reasoning_effort": null,
+      "reasoning_source": null,
       "category": "primary",
       "engine_extra_body": null,
       "max_new_tokens": 2048,
@@ -1020,6 +932,7 @@
       "endpoint": "https://api.upstage.ai/v1",
       "reasoning_mode": "provider-default",
       "reasoning_effort": null,
+      "reasoning_source": null,
       "category": "primary",
       "engine_extra_body": null,
       "max_new_tokens": 2048,
@@ -1113,6 +1026,7 @@
       "endpoint": "https://openrouter.ai/api/v1",
       "reasoning_mode": "none",
       "reasoning_effort": "none",
+      "reasoning_source": "reasoning.effort",
       "category": "ablation",
       "engine_extra_body": {
         "provider": {
@@ -1205,6 +1119,104 @@
       }
     },
     {
+      "slug": "run-20260917-032809-gemma-4-26B-A4B-it-qat-GGUF",
+      "path": "runs/run-20260917-032809-gemma-4-26B-A4B-it-qat-GGUF",
+      "model": "unsloth/gemma-4-26B-A4B-it-qat-GGUF",
+      "label": "gemma-4-26B-A4B-it-qat-GGUF (reasoning disabled)",
+      "timestamp": "2026-09-17T03:28:09Z",
+      "backend": "api",
+      "provider": "openai",
+      "endpoint": "http://192.168.35.94:8888/v1",
+      "reasoning_mode": "none",
+      "reasoning_effort": null,
+      "reasoning_source": "enable_thinking",
+      "category": "ablation",
+      "engine_extra_body": {
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        }
+      },
+      "max_new_tokens": 2048,
+      "prompt_template_hash": "3941207196edd4239a011e10649c790ed79a747490238330c32b2a2ed35383e1",
+      "dataset": {
+        "name": "snunlp/KoBALT-700",
+        "revision": "0.0.0"
+      },
+      "total": 700,
+      "correct": 411,
+      "accuracy": 0.5871428571428572,
+      "wilson_95": {
+        "lo": 0.55029,
+        "hi": 0.623044
+      },
+      "by_domain": [
+        {
+          "name": "Morphology",
+          "n": 42,
+          "correct": 20,
+          "accuracy": 0.47619047619047616
+        },
+        {
+          "name": "Phonetics/Phonology",
+          "n": 62,
+          "correct": 27,
+          "accuracy": 0.43548387096774194
+        },
+        {
+          "name": "Pragmatics",
+          "n": 81,
+          "correct": 36,
+          "accuracy": 0.4444444444444444
+        },
+        {
+          "name": "Semantics",
+          "n": 215,
+          "correct": 134,
+          "accuracy": 0.6232558139534884
+        },
+        {
+          "name": "Syntax",
+          "n": 300,
+          "correct": 194,
+          "accuracy": 0.6466666666666666
+        }
+      ],
+      "by_level": [
+        {
+          "name": "1",
+          "n": 182,
+          "correct": 169,
+          "accuracy": 0.9285714285714286
+        },
+        {
+          "name": "2",
+          "n": 220,
+          "correct": 160,
+          "accuracy": 0.7272727272727273
+        },
+        {
+          "name": "3",
+          "n": 298,
+          "correct": 82,
+          "accuracy": 0.2751677852348993
+        }
+      ],
+      "invalid": {
+        "count": 103,
+        "rate": 0.147143
+      },
+      "empty_raw_output": 0,
+      "latency_ms": {
+        "n": 700,
+        "median": 76996.5,
+        "p95": 199981.0
+      },
+      "evidence": {
+        "snapshot": "site/data/runs/run-20260917-032809-gemma-4-26B-A4B-it-qat-GGUF/config.snapshot.yaml",
+        "results": "site/data/runs/run-20260917-032809-gemma-4-26B-A4B-it-qat-GGUF/results.json"
+      }
+    },
+    {
       "slug": "run-20260919-015306-gpt-5.6-luna-floor",
       "path": "runs/run-20260919-015306-gpt-5.6-luna-floor",
       "model": "openai/gpt-5.6-luna:floor",
@@ -1215,6 +1227,7 @@
       "endpoint": "https://openrouter.ai/api/v1",
       "reasoning_mode": "none",
       "reasoning_effort": "none",
+      "reasoning_source": "reasoning.effort",
       "category": "ablation",
       "engine_extra_body": {
         "reasoning": {

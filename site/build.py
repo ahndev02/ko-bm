@@ -34,9 +34,11 @@ and per-level tables, invalid-answer count/rate (``predicted_answer``
 that is not exactly one of ``A``-``J``), empty raw-output count, and
 median / nearest-rank p95 latency.
 
-An explicit ``reasoning.effort: none`` (or ``reasoning_effort: none``) is
-classified as ``category == "ablation"`` so it stays separable from
-primary results. Every other condition is preserved plainly
+An explicit ``reasoning.effort: none`` (or ``reasoning_effort: none``),
+or ``enable_thinking: false``, is classified as ``category ==
+"ablation"`` with ``reasoning_mode == "none"`` so it stays separable
+from primary results (the presentation tier groups these as
+reasoning-disabled). Every other condition is preserved plainly
 (``engine_extra_body``); no fairness claims are made here.
 
 Only ``config.snapshot.yaml`` and ``results.json`` are copied into
@@ -470,6 +472,32 @@ def load_snapshot(path: str | Path) -> dict[str, Any]:
 # Small derivations
 # ---------------------------------------------------------------------------
 
+def _collect_effort_entries(engine_opts: Any) -> list[tuple[str, Any]]:
+    """Collect ``(form, value)`` reasoning-effort candidates in deterministic order.
+
+    Forms are ``"reasoning.effort"`` (nested mapping) and
+    ``"reasoning_effort"`` (scalar key), searched depth-first with
+    sorted keys anywhere inside ``engine_opts``.
+    """
+    entries: list[tuple[str, Any]] = []
+
+    def _search(node: Any) -> None:
+        if isinstance(node, dict):
+            reasoning = node.get("reasoning")
+            if isinstance(reasoning, dict) and "effort" in reasoning:
+                entries.append(("reasoning.effort", reasoning["effort"]))
+            if "reasoning_effort" in node:
+                entries.append(("reasoning_effort", node["reasoning_effort"]))
+            for key in sorted(node, key=str):
+                _search(node[key])
+        elif isinstance(node, list):
+            for entry in node:
+                _search(entry)
+
+    _search(engine_opts if isinstance(engine_opts, dict) else {})
+    return entries
+
+
 def find_reasoning_effort(engine_opts: Any, source: str = "engine_opts") -> str | None:
     """Return the explicit reasoning effort string, or None when absent/null.
 
@@ -482,15 +510,32 @@ def find_reasoning_effort(engine_opts: Any, source: str = "engine_opts") -> str 
     :class:`BuildError` naming ``source`` instead of silently picking one,
     since the choice can flip a run between primary and ablation.
     """
-    found: list[Any] = []
+    entries = _collect_effort_entries(engine_opts)
+    distinct = sorted({str(v) for _, v in entries if v is not None})
+    if len(distinct) > 1:
+        raise BuildError(
+            f"conflicting reasoning effort values {distinct} in {source} "
+            "(nested 'reasoning.effort' vs scalar 'reasoning_effort')"
+        )
+    return distinct[0] if distinct else None
+
+
+def find_thinking_enabled(engine_opts: Any, source: str = "engine_opts") -> bool | None:
+    """Return the explicit ``enable_thinking`` boolean, or None when absent.
+
+    Searches for boolean ``enable_thinking`` values anywhere inside
+    ``engine_opts`` (e.g. ``extra_body.chat_template_kwargs``), depth-first
+    in deterministic order. Non-boolean values are ignored: only real
+    booleans are the documented signal (everything stays preserved
+    verbatim in ``engine_extra_body``). Disagreeing booleans raise
+    :class:`BuildError` naming ``source``.
+    """
+    found: list[bool] = []
 
     def _search(node: Any) -> None:
         if isinstance(node, dict):
-            reasoning = node.get("reasoning")
-            if isinstance(reasoning, dict) and "effort" in reasoning:
-                found.append(reasoning["effort"])
-            if "reasoning_effort" in node:
-                found.append(node["reasoning_effort"])
+            if isinstance(node.get("enable_thinking"), bool):
+                found.append(node["enable_thinking"])
             for key in sorted(node, key=str):
                 _search(node[key])
         elif isinstance(node, list):
@@ -498,13 +543,61 @@ def find_reasoning_effort(engine_opts: Any, source: str = "engine_opts") -> str 
                 _search(entry)
 
     _search(engine_opts if isinstance(engine_opts, dict) else {})
-    distinct = sorted({str(v) for v in found if v is not None})
+    distinct = sorted(set(found))
     if len(distinct) > 1:
         raise BuildError(
-            f"conflicting reasoning effort values {distinct} in {source} "
-            "(nested 'reasoning.effort' vs scalar 'reasoning_effort')"
+            f"conflicting 'enable_thinking' values {distinct} in {source}"
         )
     return distinct[0] if distinct else None
+
+
+def resolve_reasoning(engine_opts: Any, source: str = "engine_opts") -> dict[str, Any]:
+    """Resolve reasoning metadata to ``{"mode", "effort", "source"}``.
+
+    - ``mode`` is ``"provider-default"``, an explicit effort string, or
+      ``"none"`` when reasoning is explicitly disabled (effort ``none``
+      or ``enable_thinking: false``).
+    - ``effort`` is the explicit effort string or None (a thinking-flag
+      disable leaves it None: no effort value was configured).
+    - ``source`` names the winning signal: ``"reasoning.effort"``,
+      ``"reasoning_effort"`` (nested form preferred when both agree),
+      ``"enable_thinking"``, or None for provider-default.
+
+    Conflict rules (rejection preferred: the presentation tier flips on
+    this classification):
+    - disagreeing effort values -> BuildError (via find_reasoning_effort);
+    - disagreeing ``enable_thinking`` booleans -> BuildError;
+    - explicit non-``none`` effort together with ``enable_thinking:
+      false`` -> BuildError;
+    - effort ``none`` together with ``enable_thinking: true`` ->
+      BuildError.
+    ``enable_thinking: true`` is otherwise default-compatible: it never
+    disables, and with no effort value the mode stays
+    ``provider-default``.
+    """
+    effort = find_reasoning_effort(engine_opts, source=source)
+    thinking = find_thinking_enabled(engine_opts, source=source)
+    if thinking is False:
+        if effort is not None and effort != "none":
+            raise BuildError(
+                f"conflicting reasoning signals in {source}: effort {effort!r} "
+                "vs 'enable_thinking: false'"
+            )
+        if effort == "none":
+            entries = _collect_effort_entries(engine_opts)
+            forms = sorted({form for form, v in entries if v is not None})
+            return {"mode": "none", "effort": "none", "source": forms[0]}
+        return {"mode": "none", "effort": None, "source": "enable_thinking"}
+    if thinking is True and effort == "none":
+        raise BuildError(
+            f"conflicting reasoning signals in {source}: effort 'none' "
+            "vs 'enable_thinking: true'"
+        )
+    if effort is None:
+        return {"mode": "provider-default", "effort": None, "source": None}
+    entries = _collect_effort_entries(engine_opts)
+    forms = sorted({form for form, v in entries if v is not None})
+    return {"mode": effort, "effort": effort, "source": forms[0]}
 
 
 def short_model_label(model_id: Any) -> str:
@@ -722,11 +815,17 @@ def summarize_run(run_dir: str | Path) -> dict[str, Any]:
         raise BuildError(f"{slug}: malformed run (no model id in snapshot or results)")
     model = str(model)
     engine_opts = backend.get("engine_opts")
-    effort = find_reasoning_effort(engine_opts, source=f"{slug}/config.snapshot.yaml")
-    reasoning_mode = "provider-default" if effort is None else effort
-    category = "ablation" if effort == "none" else "primary"
+    resolved = resolve_reasoning(engine_opts, source=f"{slug}/config.snapshot.yaml")
+    effort = resolved["effort"]
+    reasoning_mode = resolved["mode"]
+    category = "ablation" if reasoning_mode == "none" else "primary"
     short = short_model_label(model)
-    label = short if effort is None else f"{short} (reasoning effort: {effort})"
+    if effort is not None:
+        label = f"{short} (reasoning effort: {effort})"
+    elif reasoning_mode == "none":
+        label = f"{short} (reasoning disabled)"
+    else:
+        label = short
 
     extra_body = None
     if isinstance(engine_opts, dict):
@@ -771,6 +870,7 @@ def summarize_run(run_dir: str | Path) -> dict[str, Any]:
         "endpoint": backend.get("endpoint"),
         "reasoning_mode": reasoning_mode,
         "reasoning_effort": effort,
+        "reasoning_source": resolved["source"],
         "category": category,
         "engine_extra_body": extra_body,
         "max_new_tokens": generation.get("max_new_tokens"),

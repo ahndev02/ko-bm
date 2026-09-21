@@ -58,14 +58,26 @@ dataset:
 """
 
 
-def _engine_block(effort=_MISSING, style="nested"):
-    if effort is _MISSING:
+def _engine_block(effort=_MISSING, style="nested", thinking=_MISSING):
+    if effort is _MISSING and thinking is _MISSING:
         return "  engine_opts:\n    extra_body: null\n"
-    if effort is None:
-        return "  engine_opts:\n    extra_body:\n      reasoning:\n        effort: null\n"
-    if style == "underscore":
-        return f"  engine_opts:\n    extra_body:\n      reasoning_effort: {effort}\n"
-    return f"  engine_opts:\n    extra_body:\n      reasoning:\n        effort: {effort}\n"
+    body = ""
+    if effort is not _MISSING:
+        if effort is None:
+            body += "      reasoning:\n        effort: null\n"
+        elif style == "underscore":
+            body += f"      reasoning_effort: {effort}\n"
+        else:
+            body += f"      reasoning:\n        effort: {effort}\n"
+    if thinking is not _MISSING:
+        if thinking is None:
+            rendered = "null"
+        elif isinstance(thinking, bool):
+            rendered = "true" if thinking else "false"
+        else:
+            rendered = thinking
+        body += f"      chat_template_kwargs:\n        enable_thinking: {rendered}\n"
+    return "  engine_opts:\n    extra_body:\n" + body
 
 
 def make_record(i, *, pred: Any = "A", truth: Any = "A", cls: Any = "Syntax",
@@ -117,14 +129,15 @@ def results_for(records):
 
 
 def write_synthetic_run(parent, slug, records, *, model="testorg/test-model",
-                        effort=_MISSING, effort_style="nested", no_engine_opts=False,
+                        effort=_MISSING, effort_style="nested", thinking=_MISSING,
+                        no_engine_opts=False,
                         results_override=None, snapshot_extra_lines=None):
     rundir = Path(parent) / slug
     rundir.mkdir(parents=True, exist_ok=True)
     if no_engine_opts:
         engine_block = ""
     else:
-        engine_block = _engine_block(effort, style=effort_style)
+        engine_block = _engine_block(effort, style=effort_style, thinking=thinking)
     snapshot = SNAPSHOT_TEMPLATE.format(
         model=model,
         endpoint="https://example.test/v1",
@@ -344,6 +357,108 @@ def test_reasoning_effort_conflict_fails(tmp_path):
     )
     snapshot_path.write_text(text, encoding="utf-8")
     with pytest.raises(BuildError, match="conflicting reasoning effort"):
+        build.summarize_run(rundir)
+
+
+def test_thinking_flag_disabled(tmp_path):
+    assert build.find_thinking_enabled(
+        {"extra_body": {"chat_template_kwargs": {"enable_thinking": False}}}
+    ) is False
+    assert build.find_thinking_enabled(
+        {"extra_body": {"chat_template_kwargs": {"enable_thinking": True}}}
+    ) is True
+    assert build.find_thinking_enabled({"extra_body": None}) is None
+    assert build.find_thinking_enabled({}) is None
+    # non-boolean values are ignored (documented; preserved in extra_body)
+    assert build.find_thinking_enabled(
+        {"extra_body": {"chat_template_kwargs": {"enable_thinking": "false"}}}
+    ) is None
+
+    assert build.resolve_reasoning(
+        {"extra_body": {"chat_template_kwargs": {"enable_thinking": False}}}
+    ) == {"mode": "none", "effort": None, "source": "enable_thinking"}
+    assert build.resolve_reasoning(
+        {"extra_body": {"chat_template_kwargs": {"enable_thinking": True}}}
+    ) == {"mode": "provider-default", "effort": None, "source": None}
+
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    recs = three_records()
+    rundir = write_synthetic_run(
+        runs, "run-20260919-010203-nothink", recs, thinking=False
+    )
+    summary = build.summarize_run(rundir)
+    assert summary["reasoning_mode"] == "none"
+    assert summary["reasoning_effort"] is None
+    assert summary["reasoning_source"] == "enable_thinking"
+    assert summary["category"] == "ablation"
+    assert summary["label"] == "test-model (reasoning disabled)"
+    assert summary["engine_extra_body"] == {
+        "chat_template_kwargs": {"enable_thinking": False}
+    }
+
+
+def test_thinking_true_and_absent_stay_default(tmp_path):
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    recs = three_records()
+    d_true = write_synthetic_run(
+        runs, "run-20260919-010203-true", recs, thinking=True
+    )
+    d_absent = write_synthetic_run(runs, "run-20260919-010204-absent", recs)
+    for rundir in (d_true, d_absent):
+        summary = build.summarize_run(rundir)
+        assert summary["reasoning_mode"] == "provider-default"
+        assert summary["reasoning_effort"] is None
+        assert summary["reasoning_source"] is None
+        assert summary["category"] == "primary"
+        assert summary["label"] == "test-model"
+
+
+def test_thinking_effort_conflicts(tmp_path):
+    with pytest.raises(BuildError, match="conflicting reasoning signals"):
+        build.resolve_reasoning(
+            {"extra_body": {
+                "reasoning": {"effort": "minimal"},
+                "chat_template_kwargs": {"enable_thinking": False},
+            }},
+            source="test-snapshot",
+        )
+    with pytest.raises(BuildError, match="conflicting reasoning signals"):
+        build.resolve_reasoning(
+            {"extra_body": {
+                "reasoning": {"effort": "none"},
+                "chat_template_kwargs": {"enable_thinking": True},
+            }},
+            source="test-snapshot",
+        )
+    with pytest.raises(BuildError, match="conflicting 'enable_thinking'"):
+        build.find_thinking_enabled(
+            {"a": {"enable_thinking": True}, "b": {"enable_thinking": False}},
+            source="test-snapshot",
+        )
+    # agreeing disable signals are fine; the effort form names the source
+    assert build.resolve_reasoning(
+        {"extra_body": {
+            "reasoning": {"effort": "none"},
+            "chat_template_kwargs": {"enable_thinking": False},
+        }}
+    ) == {"mode": "none", "effort": "none", "source": "reasoning.effort"}
+    # effort provenance is reported for the primary forms too
+    assert build.resolve_reasoning(
+        {"extra_body": {"reasoning": {"effort": "minimal"}}}
+    )["source"] == "reasoning.effort"
+    assert build.resolve_reasoning(
+        {"extra_body": {"reasoning_effort": "low"}}
+    )["source"] == "reasoning_effort"
+
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    rundir = write_synthetic_run(
+        runs, "run-20260919-010203-conflict", three_records(),
+        effort="minimal", thinking=False,
+    )
+    with pytest.raises(BuildError, match="conflicting reasoning signals"):
         build.summarize_run(rundir)
 
 

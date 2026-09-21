@@ -1,13 +1,13 @@
 backend:
   family: api # api | transformers | vllm
-  model: openai/gpt-6-astra
+  model: anthropic/claude-opus-5
   api_provider: openai # openai | anthropic (only when family == api)
   endpoint: https://openrouter.ai/api/v1 # optional, for OpenAI-compatible endpoints
   engine_opts:
     extra_body:
       provider:
         only:
-          - openai/flex
+          - anthropic
       # chat_template_kwargs:
       #   enable_thinking: false
   max_retries: 3

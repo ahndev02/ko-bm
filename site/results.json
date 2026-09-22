@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-22T19:38:28Z",
+  "generated_at": "2026-09-22T20:49:54Z",
   "generator": "site/build.py",
   "item_count": 700,
   "dataset": {
@@ -827,6 +827,106 @@
       }
     },
     {
+      "slug": "run-20260922-184800-gpt-6-luna",
+      "path": "runs/run-20260922-184800-gpt-6-luna",
+      "model": "openai/gpt-6-luna",
+      "label": "gpt-6-luna",
+      "timestamp": "2026-09-22T18:48:00Z",
+      "backend": "api",
+      "provider": "openai",
+      "endpoint": "https://openrouter.ai/api/v1",
+      "reasoning_mode": "provider-default",
+      "reasoning_effort": null,
+      "reasoning_source": null,
+      "category": "primary",
+      "engine_extra_body": {
+        "provider": {
+          "only": [
+            "openai/flex"
+          ]
+        }
+      },
+      "max_new_tokens": 2048,
+      "prompt_template_hash": "3941207196edd4239a011e10649c790ed79a747490238330c32b2a2ed35383e1",
+      "dataset": {
+        "name": "snunlp/KoBALT-700",
+        "revision": "0.0.0"
+      },
+      "total": 700,
+      "correct": 498,
+      "accuracy": 0.7114285714285714,
+      "wilson_95": {
+        "lo": 0.67678,
+        "hi": 0.743769
+      },
+      "by_domain": [
+        {
+          "name": "Morphology",
+          "n": 42,
+          "correct": 29,
+          "accuracy": 0.6904761904761905
+        },
+        {
+          "name": "Phonetics/Phonology",
+          "n": 62,
+          "correct": 47,
+          "accuracy": 0.7580645161290323
+        },
+        {
+          "name": "Pragmatics",
+          "n": 81,
+          "correct": 57,
+          "accuracy": 0.7037037037037037
+        },
+        {
+          "name": "Semantics",
+          "n": 215,
+          "correct": 154,
+          "accuracy": 0.7162790697674418
+        },
+        {
+          "name": "Syntax",
+          "n": 300,
+          "correct": 211,
+          "accuracy": 0.7033333333333334
+        }
+      ],
+      "by_level": [
+        {
+          "name": "1",
+          "n": 182,
+          "correct": 174,
+          "accuracy": 0.9560439560439561
+        },
+        {
+          "name": "2",
+          "n": 220,
+          "correct": 181,
+          "accuracy": 0.8227272727272728
+        },
+        {
+          "name": "3",
+          "n": 298,
+          "correct": 143,
+          "accuracy": 0.4798657718120805
+        }
+      ],
+      "invalid": {
+        "count": 119,
+        "rate": 0.17
+      },
+      "empty_raw_output": 119,
+      "latency_ms": {
+        "n": 700,
+        "median": 6324.5,
+        "p95": 24419.0
+      },
+      "evidence": {
+        "snapshot": "site/data/runs/run-20260922-184800-gpt-6-luna/config.snapshot.yaml",
+        "results": "site/data/runs/run-20260922-184800-gpt-6-luna/results.json"
+      }
+    },
+    {
       "slug": "run-20260920-141152-gemma-4-26b-a4b-it",
       "path": "runs/run-20260920-141152-gemma-4-26b-a4b-it",
       "model": "google/gemma-4-26b-a4b-it",
@@ -1610,10 +1710,6 @@
     }
   ],
   "skipped": [
-    {
-      "slug": "run-20260922-184800-gpt-6-luna",
-      "reason": "missing: results.json"
-    },
     {
       "slug": "run-20260922-191958-motif-3",
       "reason": "missing: results.json"
